@@ -60,206 +60,196 @@ app.listen(port, () => {
 
 app.use(express.json());
 
-app.post("/ingresar-jugador", (req, res) => {
+app.post("/ingresar-jugador", async (req, res) => {
 
-    const nombre = req.body.nombre;
-    const auth = req.body.auth;
+    try {
 
-    const sqlJugador = "INSERT INTO jugadores (auth, nombre) VALUES (?, ?)";
-    const sqlEstadisticas = "INSERT INTO estadisticas (id_jugador, id_temporada) VALUES (?, ?)";
+        const nombre = req.body.nombre;
+        const auth = req.body.auth;
 
-    database.query(sqlJugador, [auth, nombre], (err, result) => {
+        const [jugador] = database.query(
+            "INSERT INTO jugadores (auth, nombre) VALUES (?, ?)",
+            [nombre, auth]
+        );
 
-        if(err){
-            return res.status(500).json(err);
-        }
+        const [estadistica] = database.query(
+            "INSERT INTO estadisticas (id_jugador, id_temporada) VALUES (?, ?)",
+            [jugador.insertId, TEMPORADA_ACTIVA]
+        );
 
-        const jugadorId = result.insertId;
+        res.status(201).json("Jugador y estadísticas creados exitosamente");
 
-        database.query(sqlEstadisticas, [jugadorId, TEMPORADA_ACTIVA], (err, result) => {
+    } catch (err) {
 
-            if(err){
-                return res.status(500).json(err);
-            }
+        res.status(500).json(err);
 
-            res.status(201).json("Jugador y estadísticas creados exitosamente");
-
-        });
-
-    });
+    }
 
 });
 
-app.post("/ingresar-VIP/:id", (req, res) => {
+app.post("/ingresar-VIP/:id", async (req, res) => {
 
-    const jugadorId = req.params.id;
+    try {
 
-    const sqlTest = "SELECT * FROM Jugadores WHERE id = ?"
+        const jugadorId = req.params.id;
 
-    database.query(sqlTest, jugadorId, (err, result) => {
+        const [jugador] = database.query(
+            "SELECT * FROM Jugadores WHERE id = ?",
+            [jugadorId]
+        );
 
-        if(err){
-            return res.status(500).json(err);
-        }
-
-        if(result.length === 0){
-            return res.status(404).json("Jugador no existente");
+        if(jugador.length === 0){
+            res.status(404).json("Jugador no existente");
         }
 
         const emojiDefault = '💜';
         const textoDefault = 'El vip ha ingresado!';
         const colorDefault = '#FF00FF';
 
-        const sql = `
-                INSERT INTO VIPs (jugador_id, fecha_inicio, fecha_caducacion, emoji, texto_entrada, color_texto) VALUES
-                (?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), ?, ?, ?);
-                `;
+        const [result] = database.query(
+            `
+            INSERT INTO VIPs (jugador_id, fecha_inicio, fecha_caducacion, emoji, texto_entrada, color_texto) VALUES
+            (?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), ?, ?, ?);
+            `,
+            [jugadorId, emojiDefault, textoDefault, colorDefault]
+        );
 
-        database.query(sql, [jugadorId, emojiDefault, textoDefault, colorDefault], (err, result) => {
-    
-            if(err){
-                return res.status(500).json(err);
-            }
-    
-            res.status(201).json("Vip creado exitosamente.");
-    
-        });
+        res.status(201).json("VIP creado exitosamente");
 
-    });
+    } catch (err) {
+
+        res.status(500).json(err);
+
+    }
 
 });
 
-app.post("/ingresar-jugador-rol/:id/:rol", (req, res) => {
+app.post("/ingresar-jugador-rol/:id/:rol", async (req, res) => {
 
-    const jugadorId = req.params.id;
-    const rolId = req.params.rol;
+    try {
 
-    const sqlTestJugador = "SELECT * FROM Jugadores WHERE id = ?";
+        const jugadorId = req.params.id;
+        const rolId = req.params.rol;
 
-    database.query(sqlTestJugador, jugadorId, (err, result) => {
+        const [jugador] = await database.query(
+            "SELECT * FROM Jugadores WHERE id = ?",
+            [jugadorId]
+        );
 
-        if(err){
-            return res.status(500).json(err);
-        }
-
-        if(result.length === 0){
+        if(jugador.length === 0){
             return res.status(404).json("Jugador no existente");
         }
 
-        const sqlTestRol = "SELECT * FROM Roles WHERE id = ?";
-    
-        database.query(sqlTestRol, rolId, (err, result) => {
-    
-            if(err){
-                return res.status(500).json(err);
-            }
-    
-            if(result.length === 0){
-                return res.status(404).json("Rol no existente");
-            }
-    
-            const sql = `
-                        INSERT INTO JugadoresRoles (jugador_id, rol_id) VALUES
-                        (?, ?);
-                        `;
-        
-            database.query(sql, [jugadorId, rolId], (err, result) => {
-        
-                if(err){
-                    return res.status(500).json(err);
-                }
-        
-                res.status(201).json("Jugador con rol agregado exitosamente.");
-        
-            });
+        const [rol] = await database.query(
+            "SELECT * FROM Roles WHERE id = ?",
+            [rolId]
+        );
 
-        });
-
-    });
-
-});
-
-app.get("/jugador/:id", (req, res) => {
-
-    const jugadorId = req.params.id;
-
-    const sql = `
-                SELECT * FROM jugadores j
-                INNER JOIN EstadisticasActuales e ON j.id = e.id_jugador
-                WHERE j.id = ?
-                `;
-
-    database.query(sql, jugadorId, (err, result) => {
-
-        if(err){
-            return res.status(500).json(err);
+        if(rol.length === 0){
+            return res.status(404).json("Rol no existente");
         }
 
-        if(result.length === 0){
-            return res.status(404).json("Jugador no encontrado");
-        }
+        await database.query(
+            "INSERT INTO JugadoresRoles (jugador_id, rol_id) VALUES (?, ?)",
+            [jugadorId, rolId]
+        );
 
-        res.status(200).json(result);
+        res.status(201).json("Jugador con rol agregado exitosamente.");
 
-    });
+    } catch(err){
 
-});
+        res.status(500).json(err);
 
-app.get("/VIP/:id", (req, res) => {
-
-    const jugadorId = req.params.id;
-
-    const sql = `
-                SELECT * FROM JugadoresVIPSActivos
-                WHERE id = ?
-                `;
-
-    database.query(sql, jugadorId, (err, result) => {
-
-        if(err){
-            return res.status(500).json(err);
-        }
-
-        if(result.length === 0){
-            return res.status(404).json("Jugador no encontrado");
-        }
-
-        res.status(200).json(result);
-
-    });
-
-});
-
-app.put("/:estadistica/:id", (req, res) => {
-
-    const jugadorId = req.params.id;
-    const estadistica = req.params.estadistica;
-
-    if (!estadisticasValidas.includes(estadistica)) {
-        return res.status(404).json("Estadística no existente");
     }
 
-    const gananciaXP = GANANCIA_XP[estadistica] ?? 0;
-    const gananciaMonedas = GANANCIA_MONEDAS[estadistica] ?? 0;
+});
 
-    const sql = `
-                UPDATE estadisticas
+app.get("/jugador/:id", async (req, res) => {
+
+    try {
+
+        const [result] = await database.query(
+            `
+            SELECT * FROM Jugadores j
+            LEFT JOIN EstadisticasActuales e
+            ON e.id_jugador = j.id
+            WHERE j.id = ?
+            `,
+            [req.params.id]
+        );
+
+        if(result.length === 0){
+            res.status(404).json("Jugador no existente");
+        }
+
+        res.status(200).json(result);
+
+    } catch(err) {
+
+        res.status(500).json(err);
+
+    }
+
+});
+
+app.get("/VIP/:id", async (req, res) => {
+
+    try {
+
+        const [result] = await database.query(
+            "SELECT * FROM JugadoresVIPSActivos WHERE id = ?",
+            [req.params.id]
+        );
+
+        if(result.length === 0){
+            res.status(404).json("Jugador no existente");
+        }
+
+        res.status(200).json(result);
+
+    } catch (err){
+
+        res.status(500).json(err);
+
+    }
+
+});
+
+app.put("/:estadistica/:id", async (req, res) => {
+
+    try {
+
+        const jugadorId = req.params.id;
+        const estadistica = req.params.estadistica;
+
+        if (!estadisticasValidas.includes(estadistica)) {
+            return res.status(404).json("Estadística no existente");
+        }
+
+        const gananciaXP = GANANCIA_XP[estadistica] ?? 0;
+        const gananciaMonedas = GANANCIA_MONEDAS[estadistica] ?? 0;
+
+        const [result] = database.query(
+
+            `
+            UPDATE estadisticas
                 SET ${estadistica} = ${estadistica} + 1, xp = xp + ${gananciaXP}, monedas = monedas + ${gananciaMonedas}
                 WHERE id_jugador = ? AND id_temporada = ?
-                `;
+            `,
+            [jugadorId, TEMPORADA_ACTIVA]
 
-    database.query(sql, [jugadorId, TEMPORADA_ACTIVA], (err, result) => {
-
-        if(err){
-            return res.status(500).json(err);
-        }
+        );
 
         if(result.affectedRows === 0){
-            return res.status(404).json("Jugador no encontrado");
+            return res.status(404).json("Jugador no existente");
         }
 
-        res.status(200).json(`${estadistica} actualizada exitosamente`);
+        res.status(202).json(`${estadistica} actualizado exitosamente!`);
 
-    });
+    } catch (err){
+
+        return res.status(500).json(err);
+
+    }
 
 });
