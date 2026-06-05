@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS Estadisticas (
     mvps INT DEFAULT 0,
     vallas_invictas INT DEFAULT 0,
 
+    xp INT DEFAULT 0,
     monedas INT DEFAULT 0,
 
     partidos_jugados INT DEFAULT 0,
@@ -135,6 +136,6 @@ JOIN Roles r ON jr.rol_id = r.id
 WHERE r.nombre = 'Baneado';
 
 CREATE VIEW IF NOT EXISTS EstadisticasActuales AS 
-SELECT e.id, e.id_jugador, e.id_club, e.id_temporada, e.goles, e.asistencias, e.goles_en_contra, e.mvps, e.vallas_invictas, e.monedas, e.partidos_jugados, e.partidos_ganados, e.partidos_perdidos, e.partidos_arquero, e.partidos_abandonados FROM Estadisticas e
+SELECT e.id, e.id_jugador, e.id_club, e.id_temporada, e.goles, e.asistencias, e.goles_en_contra, e.mvps, e.vallas_invictas, e.xp, e.monedas, e.partidos_jugados, e.partidos_ganados, e.partidos_perdidos, e.partidos_arquero, e.partidos_abandonados FROM Estadisticas e
 JOIN Temporadas t ON e.id_temporada = t.id
 WHERE t.activa = TRUE;
