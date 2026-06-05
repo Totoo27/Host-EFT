@@ -125,9 +125,10 @@ JOIN JugadoresRoles jr ON j.id = jr.jugador_id
 JOIN Roles r ON jr.rol_id = r.id
 WHERE r.nombre = 'Administrador';
 
-CREATE VIEW IF NOT EXISTS JugadoresVIPS AS
+CREATE VIEW IF NOT EXISTS JugadoresVIPSActivos AS
 SELECT j.id, j.auth, j.nombre, DATEDIFF(v.fecha_caducacion, CURDATE()) AS dias_restantes FROM Jugadores j
-JOIN VIPs v ON j.id = v.jugador_id;
+JOIN VIPs v ON j.id = v.jugador_id
+HAVING dias_restantes >= 0;
 
 CREATE VIEW IF NOT EXISTS JugadoresBaneados AS
 SELECT j.id, j.auth, j.nombre, "Baneado" AS estado FROM Jugadores j

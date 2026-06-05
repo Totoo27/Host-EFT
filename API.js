@@ -90,6 +90,95 @@ app.post("/ingresar-jugador", (req, res) => {
 
 });
 
+app.post("/ingresar-VIP/:id", (req, res) => {
+
+    const jugadorId = req.params.id;
+
+    const sqlTest = "SELECT * FROM Jugadores WHERE id = ?"
+
+    database.query(sqlTest, jugadorId, (err, result) => {
+
+        if(err){
+            return res.status(500).json(err);
+        }
+
+        if(result.length === 0){
+            return res.status(404).json("Jugador no existente");
+        }
+
+        const emojiDefault = '💜';
+        const textoDefault = 'El vip ha ingresado!';
+        const colorDefault = '#FF00FF';
+
+        const sql = `
+                INSERT INTO VIPs (jugador_id, fecha_inicio, fecha_caducacion, emoji, texto_entrada, color_texto) VALUES
+                (?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), ?, ?, ?);
+                `;
+
+        database.query(sql, [jugadorId, emojiDefault, textoDefault, colorDefault], (err, result) => {
+    
+            if(err){
+                return res.status(500).json(err);
+            }
+    
+            res.status(201).json("Vip creado exitosamente.");
+    
+        });
+
+    });
+
+});
+
+app.post("/ingresar-jugador-rol/:id/:rol", (req, res) => {
+
+    const jugadorId = req.params.id;
+    const rolId = req.params.rol;
+
+    const sqlTestJugador = "SELECT * FROM Jugadores WHERE id = ?";
+
+    database.query(sqlTestJugador, jugadorId, (err, result) => {
+
+        if(err){
+            return res.status(500).json(err);
+        }
+
+        if(result.length === 0){
+            return res.status(404).json("Jugador no existente");
+        }
+
+        const sqlTestRol = "SELECT * FROM Roles WHERE id = ?";
+    
+        database.query(sqlTestRol, rolId, (err, result) => {
+    
+            if(err){
+                return res.status(500).json(err);
+            }
+    
+            if(result.length === 0){
+                return res.status(404).json("Rol no existente");
+            }
+    
+            const sql = `
+                        INSERT INTO JugadoresRoles (jugador_id, rol_id) VALUES
+                        (?, ?);
+                        `;
+        
+            database.query(sql, [jugadorId, rolId], (err, result) => {
+        
+                if(err){
+                    return res.status(500).json(err);
+                }
+        
+                res.status(201).json("Jugador con rol agregado exitosamente.");
+        
+            });
+
+        });
+
+    });
+
+});
+
 app.get("/jugador/:id", (req, res) => {
 
     const jugadorId = req.params.id;
@@ -106,7 +195,32 @@ app.get("/jugador/:id", (req, res) => {
             return res.status(500).json(err);
         }
 
-        if(result.affectedRows === 0){
+        if(result.length === 0){
+            return res.status(404).json("Jugador no encontrado");
+        }
+
+        res.status(200).json(result);
+
+    });
+
+});
+
+app.get("/VIP/:id", (req, res) => {
+
+    const jugadorId = req.params.id;
+
+    const sql = `
+                SELECT * FROM JugadoresVIPSActivos
+                WHERE id = ?
+                `;
+
+    database.query(sql, jugadorId, (err, result) => {
+
+        if(err){
+            return res.status(500).json(err);
+        }
+
+        if(result.length === 0){
             return res.status(404).json("Jugador no encontrado");
         }
 
