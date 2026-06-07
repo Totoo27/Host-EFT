@@ -1,7 +1,5 @@
 const database = require('../database');
 
-const TEMPORADA_ACTIVA = 1;
-
 const { existeJugador } = require('./jugadorService');
 const { existeClub } = require('./clubService');
 
@@ -53,34 +51,34 @@ const estadisticasValidas = [
 
 ];
 
-async function agregarEstadisticaJugador(estadistica, id){
+async function agregarEstadisticaJugador(estadistica, auth, temporada){
+
+    existeEstadistica(estadistica);
+    await existeJugador(auth);
 
     const gananciaXP = GANANCIA_XP[estadistica] ?? 0;
     const gananciaMonedas = GANANCIA_MONEDAS[estadistica] ?? 0;
-
-    existeEstadistica(estadistica);
-    await existeJugador(id);
 
     await database.query(
 
             `
             UPDATE estadisticas
                 SET ${estadistica} = ${estadistica} + 1, xp = xp + ${gananciaXP}, monedas = monedas + ${gananciaMonedas}
-                WHERE id_jugador = ? AND id_temporada = ?
+                WHERE jugador_auth = ? AND id_temporada = ?
             `,
-            [id, TEMPORADA_ACTIVA]
+            [auth, temporada]
 
     );
 
 }
 
-async function agregarEstadisticaClub(estadistica, id){
-
-    const gananciaXP = GANANCIA_XP[estadistica] ?? 0;
-    const gananciaMonedas = GANANCIA_MONEDAS[estadistica] ?? 0;
+async function agregarEstadisticaClub(estadistica, id, temporada){
 
     existeEstadistica(estadistica);
     await existeClub(id);
+
+    const gananciaXP = GANANCIA_XP[estadistica] ?? 0;
+    const gananciaMonedas = GANANCIA_MONEDAS[estadistica] ?? 0;
 
     await database.query(
 
@@ -89,7 +87,7 @@ async function agregarEstadisticaClub(estadistica, id){
                 SET ${estadistica} = ${estadistica} + 1, xp = xp + ${gananciaXP}, monedas = monedas + ${gananciaMonedas}
                 WHERE id_club = ? AND id_temporada = ?
             `,
-            [id, TEMPORADA_ACTIVA]
+            [id, temporada]
 
     );
 

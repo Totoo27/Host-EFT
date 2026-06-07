@@ -4,19 +4,19 @@ async function crearJugador(nombre, auth, temporada){
 
     const [jugador] = await database.query(
             "INSERT INTO jugadores (auth, nombre) VALUES (?, ?)",
-            [nombre, auth]
+            [auth, nombre]
         );
 
     const [estadistica] = await database.query(
-            "INSERT INTO estadisticas (id_jugador, id_temporada) VALUES (?, ?)",
-            [jugador.insertId, temporada]
+            "INSERT INTO estadisticas (jugador_auth, id_temporada) VALUES (?, ?)",
+            [auth, temporada]
         );
 
 }
 
-async function crearVIP(id_jugador){
+async function crearVIP(auth){
 
-    await existeJugador(id_jugador);
+    await existeJugador(auth);
 
     const emojiDefault = '💜';
     const textoDefault = 'El vip ha ingresado!';
@@ -24,67 +24,69 @@ async function crearVIP(id_jugador){
 
     await database.query(
             `
-            INSERT INTO VIPs (jugador_id, fecha_inicio, fecha_caducacion, emoji, texto_entrada, color_texto) VALUES
+            INSERT INTO VIPs (jugador_auth, fecha_inicio, fecha_caducacion, emoji, texto_entrada, color_texto) VALUES
             (?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), ?, ?, ?);
             `,
-            [id_jugador, emojiDefault, textoDefault, colorDefault]
+            [auth, emojiDefault, textoDefault, colorDefault]
         );
 
 }
 
-async function crearJugadorRol(id_jugador, id_rol){
+async function crearJugadorRol(auth, id_rol){
 
-    await existeJugador(id_jugador);
+    await existeJugador(auth);
     await existeRol(id_rol);
 
     await database.query(
-            "INSERT INTO JugadoresRoles (jugador_id, rol_id) VALUES (?, ?)",
-            [jugadorId, rolId]
+            "INSERT INTO JugadoresRoles (jugador_auth, rol_id) VALUES (?, ?)",
+            [auth, id_rol]
     );
 
 }
 
-async function buscarJugador(id){
-
-    await existeJugador(id);
+async function buscarJugador(auth){
 
     const [rows] = await database.query(
             `
             SELECT * FROM Jugadores j
             LEFT JOIN EstadisticasActuales e
-            ON e.id_jugador = j.id
-            WHERE j.id = ?
+            ON e.jugador_auth = j.auth
+            WHERE j.auth = ?
             `,
-            [id]
+            [auth]
         );
 
-    return rows;
-
-}
-
-async function buscarVIP(id_jugador){
-
-    const [result] = await database.query(
-            "SELECT * FROM JugadoresVIPSActivos WHERE id = ?",
-            [id_jugador]
-        );
-
-    if(result.length === 0){
-        throw new Error("VIP no existente");
+    if(rows.length === 0){
+        return null;
     }
 
-    return result;
+    return rows[0];
 
 }
 
-async function eliminarJugadorRol(id_jugador, id_rol){
+async function buscarVIP(auth){
+
+    const [rows] = await database.query(
+            "SELECT * FROM JugadoresVIPSActivos WHERE auth = ?",
+            [auth]
+        );
+    
+    if(rows.length === 0){
+        return null;
+    }
+
+    return rows[0];
+
+}
+
+async function eliminarJugadorRol(auth, id_rol){
 
     const [consulta] = await database.query(
             `
             SELECT * FROM JugadoresRoles
-            WHERE jugador_id = ? AND rol_id = ?
+            WHERE jugador_auth = ? AND rol_id = ?
             `,
-            [id_jugador, id_rol]
+            [auth, id_rol]
         );
 
     if(consulta.length === 0){
@@ -94,20 +96,20 @@ async function eliminarJugadorRol(id_jugador, id_rol){
     await database.query(
             `
             DELETE FROM JugadoresRoles
-            WHERE jugador_id = ? AND rol_id = ?
+            WHERE jugador_auth = ? AND rol_id = ?
             `,
-            [id_jugador, id_rol]
+            [auth, id_rol]
         );
 
 }
 
 // Funciones de apoyo
 
-async function existeJugador(id){
+async function existeJugador(auth){
 
     const [jugador] = await database.query(
-            "SELECT * FROM Jugadores WHERE id = ?",
-            [id]
+            "SELECT * FROM Jugadores WHERE auth = ?",
+            [auth]
         );
 
     if(jugador.length === 0){

@@ -1,4 +1,7 @@
 const express = require('express');
+const router = express.Router();
+const cors = require("cors");
+
 const database = require('./database');
 
 const app = express();
@@ -8,20 +11,24 @@ const jugadorService = require('./services/jugadorService');
 const clubService = require('./services/clubService');
 const statsService = require('./services/statsService');
 
+const TEMPORADA_ACTIVA = 1;
+
 app.listen(port, () => {
     console.log("Servidor corriendo en http://localhost:" + port);
 });
 
+app.use(cors({
+    origin: "*"
+}));
 app.use(express.json());
 
 app.post("/jugador/crear", async (req, res) => {
 
     try {
 
-        const nombre = req.body.nombre;
-        const auth = req.body.auth;
+        const { nombre, auth } = req.body;
 
-        await jugadorService.crearJugador(nombre, auth);
+        await jugadorService.crearJugador(nombre, auth, TEMPORADA_ACTIVA);
 
         return res.status(201).json("Jugador y estadísticas creados exitosamente");
 
@@ -33,15 +40,15 @@ app.post("/jugador/crear", async (req, res) => {
 
 });
 
-app.post("/crear/club", async (req, res) => {
+app.post("/club/crear/:nombre/:abreviacion/:lider_auth", async (req, res) => {
 
     try{
 
-        const nombre = req.body.nombre;
-        const abreviacion = req.body.abreviacion;
-        const liderId = req.body.liderId;
+        const nombre = req.params.nombre;
+        const abreviacion = req.params.abreviacion;
+        const liderAuth = req.params.lider_auth;
 
-        await clubService.crearClub(liderId, nombre, abreviacion);
+        await clubService.crearClub(liderAuth, nombre, abreviacion, TEMPORADA_ACTIVA);
 
         return res.status(201).json("Club creado exitosamente.");
 
@@ -53,13 +60,13 @@ app.post("/crear/club", async (req, res) => {
 
 });
 
-app.post("/VIP/crear/:id", async (req, res) => {
+app.post("/VIP/crear/:auth", async (req, res) => {
 
     try {
 
-        const jugadorId = req.params.id;
+        const jugadorAuth = req.params.auth;
 
-        await jugadorService.crearVIP(jugadorId);
+        await jugadorService.crearVIP(jugadorAuth);
 
         return res.status(201).json("VIP creado exitosamente");
 
@@ -71,14 +78,14 @@ app.post("/VIP/crear/:id", async (req, res) => {
 
 });
 
-app.post("/jugador-rol/crear/:id/:rol", async (req, res) => {
+app.post("/jugador-rol/crear/:auth/:rol", async (req, res) => {
 
     try {
 
-        const jugadorId = req.params.id;
+        const jugadorAuth = req.params.auth;
         const rolId = req.params.rol;
 
-        await jugadorService.crearJugadorRol(jugadorId, rolId);
+        await jugadorService.crearJugadorRol(jugadorAuth, rolId);
 
         return res.status(201).json("Jugador con rol agregado exitosamente.");
 
@@ -90,13 +97,13 @@ app.post("/jugador-rol/crear/:id/:rol", async (req, res) => {
 
 });
 
-app.get("/jugador/buscar/:id", async (req, res) => {
+app.get("/jugador/buscar/:auth", async (req, res) => {
 
     try {
 
-        const jugadorId = req.params.id;
+        const auth = req.params.auth;
 
-        const result = await jugadorService.buscarJugador(jugadorId);
+        const result = await jugadorService.buscarJugador(auth);
 
         return res.status(200).json(result);
 
@@ -108,13 +115,13 @@ app.get("/jugador/buscar/:id", async (req, res) => {
 
 });
 
-app.get("/VIP/buscar/:id", async (req, res) => {
+app.get("/VIP/buscar/:auth", async (req, res) => {
 
     try {
 
-        const jugadorId = req.params.id;
+        const jugadorAuth = req.params.auth;
 
-        const result = await jugadorService.buscarVIP(jugadorId);
+        const result = await jugadorService.buscarVIP(jugadorAuth);
 
         return res.status(200).json(result);
 
@@ -126,14 +133,14 @@ app.get("/VIP/buscar/:id", async (req, res) => {
 
 });
 
-app.put("/jugador/agregar-estadistica/:estadistica/:id", async (req, res) => {
+app.put("/jugador/agregar-estadistica/:estadistica/:auth", async (req, res) => {
 
     try {
 
         const estadistica = req.params.estadistica;
-        const jugadorId = req.params.id;
+        const jugadorAuth = req.params.auth;
 
-        await statsService.agregarEstadisticaJugador(estadistica, jugadorId);
+        await statsService.agregarEstadisticaJugador(estadistica, jugadorAuth, TEMPORADA_ACTIVA);
 
         return res.status(200).json(`${estadistica} actualizado exitosamente en jugador!`);
 
@@ -152,7 +159,7 @@ app.put("/club/agregar-estadistica/:estadistica/:id", async (req, res) => {
         const estadistica = req.params.estadistica;
         const clubId = req.params.id;
 
-        await statsService.agregarEstadisticaClub(estadistica, clubId);
+        await statsService.agregarEstadisticaClub(estadistica, clubId, TEMPORADA_ACTIVA);
 
         return res.status(200).json(`${estadistica} actualizado exitosamente en club!`);
 
@@ -164,14 +171,14 @@ app.put("/club/agregar-estadistica/:estadistica/:id", async (req, res) => {
 
 });
 
-app.put("/club/agregar/:idJugador/:idClub", async (req, res) => {
+app.put("/club/agregar/:authJugador/:idClub", async (req, res) => {
 
     try{
 
-        const jugadorId = req.params.idJugador;
+        const jugadorAuth = req.params.authJugador;
         const clubId = req.params.idClub;
 
-        await clubService.unirJugador(jugadorId, clubId);
+        await clubService.unirJugador(jugadorAuth, clubId);
 
         return res.status(200).json("Jugador cambiado de club exitosamente");
 
@@ -183,13 +190,13 @@ app.put("/club/agregar/:idJugador/:idClub", async (req, res) => {
 
 });
 
-app.put("/club/eliminar-jugador/:id", async (req, res) => {
+app.put("/club/eliminar-jugador/:auth", async (req, res) => {
 
     try{
 
-        const jugadorId = req.params.id;
+        const jugadorAuth = req.params.auth;
 
-        await clubService.eliminarJugador(jugadorId);
+        await clubService.eliminarJugador(jugadorAuth);
 
         return res.status(200).json("Jugador eliminado de club exitosamente");
 
@@ -201,14 +208,14 @@ app.put("/club/eliminar-jugador/:id", async (req, res) => {
 
 });
 
-app.delete("/jugador-rol/eliminar/:idJugador/:idRol", async (req, res) => {
+app.delete("/jugador-rol/eliminar/:authJugador/:idRol", async (req, res) => {
 
     try{
 
-        const jugadorId = req.params.idJugador;
+        const jugadorAuth = req.params.authJugador;
         const rolId = req.params.idRol;
 
-        await jugadorService.eliminarJugadorRol(jugadorId, rolId);
+        await jugadorService.eliminarJugadorRol(jugadorAuth, rolId);
 
         return res.status(200).json("Conexión rol-jugador eliminada exitosamente.");
 
