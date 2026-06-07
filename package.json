@@ -5,9 +5,9 @@
   "license": "ISC",
   "author": "Toto",
   "type": "commonjs",
-  "main": "API.js",
+  "main": "./API/index.js",
   "scripts": {
-    "start": "nodemon API.js",
+    "start": "nodemon ./API/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {

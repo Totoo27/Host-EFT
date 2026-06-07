@@ -38,6 +38,10 @@ CREATE TABLE IF NOT EXISTS Jugadores (
 
 );
 
+ALTER TABLE Clubes 
+ADD id_lider INT,
+ADD CONSTRAINT FK_lider
+FOREIGN KEY (id_lider) REFERENCES Jugadores(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS Remeras (
 
