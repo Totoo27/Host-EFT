@@ -44,11 +44,25 @@ async function crearJugadorRol(auth, id_rol){
 
 }
 
+/* 
+  "xp": 0,
+  "monedas": 0,
+  "partidos_jugados": 0,
+  "partidos_ganados": 0,
+  "partidos_perdidos": 0,
+  "partidos_arquero": 0,
+  "partidos_abandonados": 0 
+  */
+
 async function buscarJugador(auth){
 
     const [rows] = await database.query(
             `
-            SELECT * FROM Jugadores j
+            SELECT 
+            j.auth, j.nombre, j.id_club, 
+            e.goles, e.asistencias, e.goles_en_contra, e.vallas_invictas, e.mvps, e.xp, e.monedas,
+            e.partidos_jugados, e.partidos_ganados, e.partidos_perdidos, e.partidos_arquero, e.partidos_abandonados
+            FROM Jugadores j
             LEFT JOIN EstadisticasActuales e
             ON e.jugador_auth = j.auth
             WHERE j.auth = ?

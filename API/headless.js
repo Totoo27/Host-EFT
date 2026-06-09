@@ -1,12 +1,6 @@
 
-const roomName = "El futbol de Toto";
-const maxPlayers = 20;
-
-const scoreLimit = 4;
-const timeLimit = 4;
-
+// API
 const APIPort = 4321;
-
 const playersInfo = {};
 
 const stadium = `{  "name" : "EFT Map",
@@ -241,6 +235,11 @@ const stadium = `{  "name" : "EFT Map",
     "traits" : {}}`;
 
 // Init Room
+const roomName = "El futbol de Toto";
+const maxPlayers = 20;
+const scoreLimit = 4;
+const timeLimit = 4;
+
 var room = HBInit({
 	roomName: roomName,
 	maxPlayers: maxPlayers,
@@ -252,6 +251,29 @@ room.setCustomStadium(stadium);
 room.setScoreLimit(scoreLimit);
 room.setTimeLimit(timeLimit);
 
+// Announcements
+
+const textColor = {
+    ERROR: 0xFF0000,
+    NORMAL: 0xFFFFFF,
+    STATS: 0xD69D29
+};
+
+const textSound = {
+    MUTE: 0,
+    NORMAL: 1,
+    IMPORTANT: 2
+};
+
+const textFont = {
+    NORMAL: "normal",
+    BOLD: "bold",
+    ITALIC: "italic",
+    SMALL: "small",
+    SMALL_BOLD: "small-bold",
+    SMALL_ITALIC: "small-italic"
+};
+
 room.onPlayerJoin = async function(player){
 
     if(!(await playerExists(player.auth))){
@@ -262,6 +284,8 @@ room.onPlayerJoin = async function(player){
         auth: player.auth,
         conn: player.conn
     };
+
+    await showStats(player);
 
 }
 
@@ -275,10 +299,31 @@ room.onPlayerLeave = async function(player){
 
 }
 
+async function showStats(requestPlayer){
+
+    if(!(await playerExists(requestPlayer.auth))){
+        room.sendAnnouncement("ERROR: No estas cargado en la base de datos", requestPlayer.id, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+        return;
+    }
+
+    const player = await API.searchPlayer(requestPlayer.auth);
+
+    room.sendAnnouncement("--- Estadísticas de: " + player.nombre + " ---", null, textColor.STATS, textFont.NORMAL, textSound.MUTE);
+    room.sendAnnouncement(
+    `
+    G⚽: ${player.goles} | A👟:  ${player.asistencias} | EC🤡: ${player.goles_en_contra} | MVP🏆: ${player.mvps}
+    PJ: ${player.partidos_jugados} | PG✅: ${player.partidos_ganados} | PP❌: ${player.partidos_perdidos} | DF💩: ${player.partidos_abandonados}
+    PA🧤: ${player.partidos_arquero} | VI🥅: ${player.vallas_invictas}
+    💲 ${player.monedas} | XP🔰: ${player.xp}
+    `, null, textColor.STATS, textFont.SMALL, textSound.NORMAL
+    );
+
+}
+
 async function playerExists(auth){
 
-    const jugador = await API.searchPlayer(auth);
-    return jugador !== null;
+    const player = await API.searchPlayer(auth);
+    return player !== null;
 
 }
 
