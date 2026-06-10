@@ -22,10 +22,10 @@ const GANANCIA_XP = {
 
 const GANANCIA_MONEDAS = {
 
-    goles: 30,
-    asistencias: 20,
-    vallas_invictas: 50,
-    mvps: 30,
+    goles: 50,
+    asistencias: 25,
+    vallas_invictas: 100,
+    mvps: 50,
     partidos_ganados: 10,
     
     goles_en_contra: 0,
@@ -95,6 +95,7 @@ async function agregarEstadisticaClub(estadistica, id, temporada){
 
 function existeEstadistica(estadistica){
     if (!estadisticasValidas.includes(estadistica)) {
+        console.log("Estadistica no existente" + estadistica);
         throw new Error("Estadistica no existente");
     }
 }

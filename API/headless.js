@@ -1,7 +1,6 @@
 
 // API
 const APIPort = 4321;
-const playersInfo = {};
 
 const stadium = `{  "name" : "EFT Map",
     "width" : 800,
@@ -250,6 +249,7 @@ var room = HBInit({
 room.setCustomStadium(stadium);
 room.setScoreLimit(scoreLimit);
 room.setTimeLimit(timeLimit);
+room.setTeamsLock(true)
 
 // Announcements
 
@@ -274,17 +274,31 @@ const textFont = {
     SMALL_ITALIC: "small-italic"
 };
 
+// Player Management
+
+let playersTeam = [
+    new Set(),
+    new Set(),
+    new Set()
+    ];
+let playersInfo = new Map();
+
+// GoalKeeper Management
+let isGKgot = false; 
+let gkRed = -1;
+let gkBlue = -1;
+
+// EVENTS
+
 room.onPlayerJoin = async function(player){
 
     if(!(await playerExists(player.auth))){
         await API.createPlayer(player.name, player.auth);
     }
 
-    playersInfo[player.id] = {
-        auth: player.auth,
-        conn: player.conn
-    };
+    playersInfo.set(player.id, player.auth.toString(), player.conn.toString());
 
+    room.startGame();
     await showStats(player);
 
 }
@@ -293,10 +307,182 @@ room.onPlayerLeave = async function(player){
     
     const auth = playersInfo[player.id]?.auth;
 
-    console.log(auth);
+    updateTeamsQuit(player.team, player.id);
 
     delete playersInfo[player.id];
 
+}
+
+room.onTeamVictory = async function(scores){
+
+    const RED = 1;
+    const BLUE = 2;
+    let winningTeam = -1;
+
+    if(scores.red > scores.blue){
+        winningTeam = RED;
+    } else if (scores.blue > scores.red){
+        winningTeam = BLUE;
+    }
+
+    await saveGameStats(winningTeam);
+
+}
+
+room.onPlayerTeamChange = function (changedPlayer, byPlayer){
+
+    updateTeamsChange(changedPlayer.team, changedPlayer.id);
+
+}
+
+room.onGameStart = function (byPlayer){
+
+
+
+}
+
+room.onStadiumChange = function(newStadiumName, byPlayer) {
+    if (newStadiumName === "EFT Map") return;
+    
+    if (!admins_ofi.has(byPlayer.id)) {
+        room.sendAnnouncement("No se puede cambiar de mapa", byPlayer.id, cor[indexCor.get("rojo")], "bold", sonido[2])
+        room.setCustomStadium(stadium); // Restaurar el estadio del host
+    }
+};
+
+room.onGameStop = function () {
+
+    restartGKs();
+
+}
+
+room.onGameTick = function(){
+
+    const RED = 1;
+    const BLUE = 2;
+
+    let ballPosition = room.getBallPosition();
+
+    if (ballPosition.x != 0 || ballPosition.y != 0) {
+        
+        if(!isGKgot){
+            
+            gkRed = getGK(RED, false)
+            gkBlue = getGK(BLUE, false); 
+            isGKgot = true;
+
+            console.log(gkRed);
+            console.log(gkBlue);
+
+        }
+
+    }
+
+}
+
+
+// FUNCTIONS 
+
+function getGK(team, replacement) {
+
+    if (team >= 3 || team <= 0) return -1;
+    if (playersTeam[team].size <= 0) return -1;
+
+    let firstPlayer = playersTeam[team].values().next().value
+    if (playersTeam[team].size == 1) return firstPlayer;
+
+    // Definir arco según equipo
+    let archPositionX;
+    if (team == 1) {
+        archPositionX = -700;
+    } else {
+        archPositionX = 700;
+    }
+
+    // Inicializar con el primero
+    let id = firstPlayer;
+    let lesserDistance = Math.abs(
+        room.getPlayer(id).position.x - archPositionX
+    );
+
+    // Buscar el más cercano al arco
+    for (const playerID of playersTeam[team]) {
+
+        let distance = Math.abs(
+            room.getPlayer(playerID).position.x - archPositionX
+        );
+
+        if (distance < lesserDistance) {
+            lesserDistance = distance;
+            id = playerID;
+        }
+    }
+
+    // Mover unicamente si es al principio del partido
+    /* if(!replacement){
+        movePlayer(id, arcoX, -10);
+    } */
+
+    return id;
+}
+
+function restartGKs(){
+    isGKgot = false;
+    gkRed = -1;
+    gkBlue = -1;
+}
+
+async function saveGameStats(winningTeam){
+
+    if(!areEnoughPlayers()){
+        console.log("No hay jugadores suficientes para guardar estadísticas de partido");
+        return;
+    }
+    
+    if(winningTeam === -1){
+        console.log("ERROR: No se guardaron estadisticas, equipo mal cargado");
+        return;
+    }
+    
+    const PLAYERS_AMOUNT = 4;
+    const TEAMS_AMOUNT = 2;
+    const RED = 1;
+    const BLUE = 2;
+
+    const scores = room.getScores();
+
+    for(let team = 1; team < TEAMS_AMOUNT + 1; team++){
+
+        for (const playerID of playersTeam[team]) {
+            
+            let playerAuth = getAuth(playerID);
+
+            await API.updatePlayerStats(playerAuth, "partidos_jugados");
+
+            if(isGK(playerID)){
+
+                await API.updatePlayerStats(playerAuth, "partidos_arquero");
+
+                const cleanSheet = winningTeam === team && (scores.red == 0 || scores.blue == 0);
+
+                if(cleanSheet){
+                    await API.updatePlayerStats(playerAuth, "vallas_invictas");
+                }
+            }            
+
+            if(team === winningTeam){
+                await API.updatePlayerStats(playerAuth, "partidos_ganados");
+            } else {
+                await API.updatePlayerStats(playerAuth, "partidos_perdidos");
+            }
+            
+        }
+        
+    }
+}
+
+function isGK(playerID){
+    return playerID === gkRed || playerID === gkBlue;
 }
 
 async function showStats(requestPlayer){
@@ -317,6 +503,53 @@ async function showStats(requestPlayer){
     💲 ${player.monedas} | XP🔰: ${player.xp}
     `, null, textColor.STATS, textFont.SMALL, textSound.NORMAL
     );
+
+}
+
+function updateTeamsChange(team, playerID) {  
+
+    for(let i = 0; i < playersTeam.length; i++) {
+        playersTeam[i].delete(playerID);
+    }
+
+    playersTeam[team].add(playerID);
+    console.log(playersTeam[team]);
+}
+
+function updateTeamsQuit(team, playerID) {
+    switch (team) {
+            case 0:
+                playersTeam[0].delete(playerID);
+                break;
+            case 1:
+                playersTeam[1].delete(playerID);
+                break;
+            case 2:
+                playersTeam[2].delete(playerID);
+                break;
+        }
+}
+
+function getAuth(playerId) {
+
+    if (!playersInfo.has(playerId)) {
+        return -1;
+    }
+
+    return playersInfo.get(playerId);
+}
+
+function areEnoughPlayers(){
+
+    const RED = 1;
+    const BLUE = 2;
+    const PLAYER_AMOUNT = 4;
+
+    if(playersTeam[RED].size != PLAYER_AMOUNT || playersTeam[BLUE].size != PLAYER_AMOUNT){
+        return false;
+    }
+
+    return true;
 
 }
 
@@ -368,6 +601,36 @@ const API = {
         // console.log(response.status);
     
         return await response.json();
+
+    },
+
+    async updatePlayerStats(auth, stat){
+
+        if(!areEnoughPlayers()){
+            console.log("No hay jugadores suficientes para guardar estadísticas");
+            return;
+        }
+
+        const response = await fetch(
+            `http://localhost:${APIPort}/jugador/agregar-estadistica`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    stat,
+                    auth
+                })
+            }
+            
+        )
+
+        /*
+        console.log(response.status);
+        const data = await response.text();
+        console.log(data);
+        */
 
     }
 

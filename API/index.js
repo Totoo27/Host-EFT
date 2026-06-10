@@ -133,16 +133,15 @@ app.get("/VIP/buscar/:auth", async (req, res) => {
 
 });
 
-app.put("/jugador/agregar-estadistica/:estadistica/:auth", async (req, res) => {
+app.put("/jugador/agregar-estadistica", async (req, res) => {
 
     try {
 
-        const estadistica = req.params.estadistica;
-        const jugadorAuth = req.params.auth;
+        const { stat, auth } = req.body;
 
-        await statsService.agregarEstadisticaJugador(estadistica, jugadorAuth, TEMPORADA_ACTIVA);
+        await statsService.agregarEstadisticaJugador(stat, auth, TEMPORADA_ACTIVA);
 
-        return res.status(200).json(`${estadistica} actualizado exitosamente en jugador!`);
+        return res.status(200).json(`${stat} actualizado exitosamente en jugador!`);
 
     } catch (err){
 
