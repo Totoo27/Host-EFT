@@ -281,7 +281,13 @@ let playersTeam = [
     new Set(),
     new Set()
     ];
+
 let playersInfo = new Map();
+
+let playerKickBall = [ 
+    -1, 
+    -1
+    ];
 
 // GoalKeeper Management
 let isGKgot = false; 
@@ -313,6 +319,31 @@ room.onPlayerLeave = async function(player){
 
 }
 
+room.onTeamGoal = async function(team){
+
+    // room.sendAnnouncement(playerKickBall[0].name + " Metió gol team: " + playerKickBall[0].team + " ID: " + playerKickBall[0].id, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
+
+    let assistantAuth = -1;
+    let scorerAuth = getAuth(playerKickBall[0].id);
+
+    if(playerKickBall[0].id !== playerKickBall[1].id && playerKickBall[0].team === playerKickBall[1].team){   
+        assistantAuth = getAuth(playerKickBall[1].id);
+    }
+
+    if(playerKickBall[0].team === team){
+        room.sendAnnouncement("golazo de " + playerKickBall[0].name, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
+        await API.updatePlayerStats(scorerAuth, "goles");
+        if(assistantAuth !== -1){
+            room.sendAnnouncement("asistencia de " + playerKickBall[1].name, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
+            await API.updatePlayerStats(assistantAuth, "asistencias");
+        }
+    } else {
+        room.sendAnnouncement("golazo en contra de " + playerKickBall[0].name, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
+        await API.updatePlayerStats(scorerAuth, "goles_en_contra");
+    }
+
+}
+
 room.onTeamVictory = async function(scores){
 
     const RED = 1;
@@ -335,11 +366,18 @@ room.onPlayerTeamChange = function (changedPlayer, byPlayer){
 
 }
 
+room.onPlayerBallKick = function (player) {
+    playerKickBall[1] = playerKickBall[0]
+    playerKickBall[0] = player
+}
+
 room.onGameStart = function (byPlayer){
 
 
 
 }
+
+
 
 room.onStadiumChange = function(newStadiumName, byPlayer) {
     if (newStadiumName === "EFT Map") return;
@@ -353,6 +391,10 @@ room.onStadiumChange = function(newStadiumName, byPlayer) {
 room.onGameStop = function () {
 
     restartGKs();
+    playerKickBall = [
+        -1,
+        -1
+    ];
 
 }
 
@@ -370,9 +412,6 @@ room.onGameTick = function(){
             gkRed = getGK(RED, false)
             gkBlue = getGK(BLUE, false); 
             isGKgot = true;
-
-            console.log(gkRed);
-            console.log(gkBlue);
 
         }
 
@@ -513,7 +552,7 @@ function updateTeamsChange(team, playerID) {
     }
 
     playersTeam[team].add(playerID);
-    console.log(playersTeam[team]);
+    
 }
 
 function updateTeamsQuit(team, playerID) {
@@ -540,6 +579,8 @@ function getAuth(playerId) {
 }
 
 function areEnoughPlayers(){
+
+    return true;
 
     const RED = 1;
     const BLUE = 2;
