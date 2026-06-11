@@ -311,11 +311,12 @@ room.onPlayerJoin = async function(player){
 
 room.onPlayerLeave = async function(player){
     
+    const SPEC = 0
     const ID = player.id;
     const team = player.team;
     const auth = getAuth(ID);
 
-    if(playersTeam[team].has(ID)){
+    if(team !== SPEC){
         await API.updatePlayerStats(auth, "partidos_abandonados");
     }
 
