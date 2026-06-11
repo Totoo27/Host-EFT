@@ -294,6 +294,10 @@ let isGKgot = false;
 let gkRed = -1;
 let gkBlue = -1;
 
+// Game Management
+
+let isGameStarted = false;
+
 // EVENTS
 
 room.onPlayerJoin = async function(player){
@@ -305,9 +309,8 @@ room.onPlayerJoin = async function(player){
     playersInfo.set(player.id, player.auth.toString(), player.conn.toString());
 
     room.startGame();
-    await showStats(player);
 
-}
+};
 
 room.onPlayerLeave = async function(player){
     
@@ -316,7 +319,7 @@ room.onPlayerLeave = async function(player){
     const team = player.team;
     const auth = getAuth(ID);
 
-    if(team !== SPEC){
+    if(team !== SPEC && isGameStarted){
         await API.updatePlayerStats(auth, "partidos_abandonados");
     }
 
@@ -324,7 +327,7 @@ room.onPlayerLeave = async function(player){
 
     delete playersInfo[ID];
 
-}
+};
 
 room.onTeamGoal = async function(team){
 
@@ -349,7 +352,7 @@ room.onTeamGoal = async function(team){
         await API.updatePlayerStats(scorerAuth, "goles_en_contra");
     }
 
-}
+};
 
 room.onTeamVictory = async function(scores){
 
@@ -365,32 +368,57 @@ room.onTeamVictory = async function(scores){
 
     await saveGameStats(winningTeam);
 
-}
+};
+
+room.onPlayerChat = function (player, message, playerName) {
+
+    if (message.charAt(0) == '!') {
+        words = message.split(" ")
+        switch (words[0].substring(1)) {
+
+            case "admin":
+                room.setPlayerAdmin(player.id, true);
+            break;
+
+            case "nv":
+            case "bb":
+                room.kickPlayer(player.id, "Nos vemos!", false);
+            break;
+
+            case "stats":
+                showStats(player.id);
+            break;
+
+            case "rr":
+                // Solo admins
+                room.stopGame();
+                room.startGame();
+            break;
+
+            default:
+                room.sendAnnouncement("Comando no existente, utiliza !help para ver los comandos", null, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+
+        }
+
+    }
+
+    return false;
+
+};
 
 room.onPlayerTeamChange = function (changedPlayer, byPlayer){
 
     updateTeamsChange(changedPlayer.team, changedPlayer.id);
 
-}
+};
 
 room.onPlayerBallKick = function (player) {
     playerKickBall[1] = playerKickBall[0]
     playerKickBall[0] = player
-}
+};
 
 room.onGameStart = function (byPlayer){
 
-
-
-}
-
-room.onStadiumChange = function(newStadiumName, byPlayer) {
-    if (newStadiumName === "EFT Map") return;
-    
-    if (!admins_ofi.has(byPlayer.id)) {
-        room.sendAnnouncement("No se puede cambiar de mapa", byPlayer.id, cor[indexCor.get("rojo")], "bold", sonido[2])
-        room.setCustomStadium(stadium); // Restaurar el estadio del host
-    }
 };
 
 room.onGameStop = function () {
@@ -400,8 +428,9 @@ room.onGameStop = function () {
         -1,
         -1
     ];
+    isGameStarted = false;
 
-}
+};
 
 room.onGameTick = function(){
 
@@ -410,8 +439,10 @@ room.onGameTick = function(){
 
     let ballPosition = room.getBallPosition();
 
-    if (ballPosition.x != 0 || ballPosition.y != 0) {
+    if ((ballPosition.x != 0 || ballPosition.y != 0) && !isGameStarted) {
         
+        isGameStarted = true;
+
         if(!isGKgot){
             
             gkRed = getGK(RED, false)
@@ -422,7 +453,16 @@ room.onGameTick = function(){
 
     }
 
-}
+};
+
+room.onStadiumChange = function(newStadiumName, byPlayer) {
+    if (newStadiumName === "EFT Map") return;
+    
+    if (!admins_ofi.has(byPlayer.id)) {
+        room.sendAnnouncement("No se puede cambiar de mapa", byPlayer.id, cor[indexCor.get("rojo")], "bold", sonido[2])
+        room.setCustomStadium(stadium); // Restaurar el estadio del host
+    }
+};
 
 
 // FUNCTIONS 
@@ -538,22 +578,26 @@ function isGK(playerID){
     return playerID === gkRed || playerID === gkBlue;
 }
 
-async function showStats(requestPlayer){
+async function showStats(playerID){
 
-    if(!(await playerExists(requestPlayer.auth))){
-        room.sendAnnouncement("ERROR: No estas cargado en la base de datos", requestPlayer.id, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+    let auth = getAuth(playerID);
+
+    if(!(await playerExists(auth))){
+        room.sendAnnouncement("ERROR: No estas cargado en la base de datos", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
         return;
     }
 
-    const player = await API.searchPlayer(requestPlayer.auth);
+    const player = await API.searchPlayer(auth);
 
-    room.sendAnnouncement("--- Estadísticas de: " + player.nombre + " ---", null, textColor.STATS, textFont.NORMAL, textSound.MUTE);
+    room.sendAnnouncement("--- Estadísticas de " + player.nombre + " ---", null, textColor.STATS, textFont.NORMAL, textSound.MUTE);
     room.sendAnnouncement(
     `
     G⚽: ${player.goles} | A👟:  ${player.asistencias} | EC🤡: ${player.goles_en_contra} | MVP🏆: ${player.mvps}
     PJ: ${player.partidos_jugados} | PG✅: ${player.partidos_ganados} | PP❌: ${player.partidos_perdidos} | DF💩: ${player.partidos_abandonados}
     PA🧤: ${player.partidos_arquero} | VI🥅: ${player.vallas_invictas}
-    💲 ${player.monedas} | XP🔰: ${player.xp}
+
+    💲 ${player.monedas}
+    XP🔰: ${player.xp}
     `, null, textColor.STATS, textFont.SMALL, textSound.NORMAL
     );
 
@@ -653,7 +697,7 @@ const API = {
             }
         )
 
-        // console.log(response.status);
+        //console.log(response.status);
     
         return await response.json();
 
