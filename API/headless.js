@@ -311,11 +311,17 @@ room.onPlayerJoin = async function(player){
 
 room.onPlayerLeave = async function(player){
     
-    const auth = playersInfo[player.id]?.auth;
+    const ID = player.id;
+    const team = player.team;
+    const auth = getAuth(ID);
 
-    updateTeamsQuit(player.team, player.id);
+    if(playersTeam[team].has(ID)){
+        await API.updatePlayerStats(auth, "partidos_abandonados");
+    }
 
-    delete playersInfo[player.id];
+    updateTeamsQuit(team, ID);
+
+    delete playersInfo[ID];
 
 }
 
@@ -376,8 +382,6 @@ room.onGameStart = function (byPlayer){
 
 
 }
-
-
 
 room.onStadiumChange = function(newStadiumName, byPlayer) {
     if (newStadiumName === "EFT Map") return;
@@ -458,11 +462,20 @@ function getGK(team, replacement) {
     }
 
     // Mover unicamente si es al principio del partido
-    /* if(!replacement){
+    if(!replacement){
         movePlayer(id, arcoX, -10);
-    } */
+    }
 
     return id;
+}
+
+function movePlayer(id, x, y) {
+    room.setPlayerDiscProperties(id, {
+        x: x,
+        y: y,
+        xspeed: 0,
+        yspeed: 0
+    });
 }
 
 function restartGKs(){
