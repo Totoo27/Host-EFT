@@ -133,6 +133,25 @@ app.get("/VIP/buscar/:auth", async (req, res) => {
 
 });
 
+app.get("/jugador-rol/buscar/:auth/:rolId", async (req, res) => {
+
+    try{
+
+        const jugadorAuth = req.params.auth;
+        const rolId = req.params.rolId;
+
+        const result = await jugadorService.buscarRol(jugadorAuth, rolId);
+
+        return res.status(200).json(result);
+
+    }catch(err){
+
+        return res.status(500).json(err);
+
+    }
+
+});
+
 app.put("/jugador/agregar-estadistica", async (req, res) => {
 
     try {

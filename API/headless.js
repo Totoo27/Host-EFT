@@ -282,6 +282,8 @@ let playersTeam = [
     new Set()
     ];
 
+let adminsList = new Set();
+
 let playersInfo = new Map();
 
 let playerKickBall = [ 
@@ -302,13 +304,19 @@ let isGameStarted = false;
 
 room.onPlayerJoin = async function(player){
 
-    if(!(await playerExists(player.auth))){
-        await API.createPlayer(player.name, player.auth);
+    const auth = player.auth;
+    const playerID = player.id;
+
+    if(!(await playerExists(auth))){
+        await API.createPlayer(player.name, auth);
     }
 
-    playersInfo.set(player.id, player.auth.toString(), player.conn.toString());
+    if(await isAdmin(auth)){
+        adminsList.add(playerID);
+        room.setPlayerAdmin(playerID, true);
+    }
 
-    room.startGame();
+    playersInfo.set(playerID, auth.toString(), player.conn.toString());
 
 };
 
@@ -324,6 +332,16 @@ room.onPlayerLeave = async function(player){
     }
 
     updateTeamsQuit(team, ID);
+
+    if (adminsList.has(player.id)){
+        adminsList.delete(player.id);
+    }
+
+    if(ID === gkBlue){
+        gkBlue = getGK(2, true);
+    }else if(ID === gkRed){
+        gkRed = getGK(1, true);
+    }
 
     delete playersInfo[ID];
 
@@ -372,27 +390,34 @@ room.onTeamVictory = async function(scores){
 
 room.onPlayerChat = function (player, message, playerName) {
 
+    const permissionMessage = "No tenés los permisos para realizar este comando.";
+    const playerID = player.id;
+
     if (message.charAt(0) == '!') {
         words = message.split(" ")
         switch (words[0].substring(1)) {
 
             case "admin":
-                room.setPlayerAdmin(player.id, true);
+                room.setPlayerAdmin(playerID, true);
             break;
 
             case "nv":
             case "bb":
-                room.kickPlayer(player.id, "Nos vemos!", false);
+                room.kickPlayer(playerID, "Nos vemos!", false);
             break;
 
             case "stats":
-                showStats(player.id);
+                showStats(playerID);
             break;
 
             case "rr":
-                // Solo admins
+
+                if(!adminsList.has(playerID)){
+                    room.sendAnnouncement(permissionMessage, null, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                }
                 room.stopGame();
                 room.startGame();
+
             break;
 
             default:
@@ -659,6 +684,15 @@ async function playerExists(auth){
 
 }
 
+async function isAdmin(auth){
+
+    const ADMIN = 1;
+    const player = await API.searchPlayerRole(auth, ADMIN);
+
+    return player !== null;
+
+}
+
 const API = {
 
     async createPlayer(nombre, auth){
@@ -730,6 +764,22 @@ const API = {
         const data = await response.text();
         console.log(data);
         */
+
+    },
+
+    async searchPlayerRole(auth, role){
+
+        const response = await fetch(
+            `http://localhost:${APIPort}/jugador-rol/buscar/${auth}/${role}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+            }
+        )
+
+        return await response.json();
 
     }
 

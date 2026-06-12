@@ -93,6 +93,27 @@ async function buscarVIP(auth){
 
 }
 
+async function buscarRol(auth, rolId){
+
+    await existeRol(rolId);
+    await existeJugador(auth);
+
+    const [rows] = await database.query(
+        `
+        SELECT * FROM JugadoresRoles
+        WHERE jugador_auth = ? AND rol_id = ?
+        `,
+        [auth, rolId]
+    );
+
+    if(rows.length === 0){
+        return null;
+    }
+
+    return rows[0];
+
+}
+
 async function eliminarJugadorRol(auth, id_rol){
 
     const [consulta] = await database.query(
@@ -154,6 +175,7 @@ module.exports = {
     buscarJugador,
     buscarVIP,
 
+    buscarRol,
     eliminarJugadorRol
 
 }
