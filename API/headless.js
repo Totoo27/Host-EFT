@@ -257,7 +257,8 @@ const textColor = {
     ERROR: 0xFF0000,
     NORMAL: 0xFFFFFF,
     STATS: 0xD69D29,
-    ADMIN: 0x38D6D6
+    ADMIN: 0x38D6D6,
+    SUCCESS: 0x58C78E
 };
 
 const textSound = {
@@ -387,10 +388,6 @@ room.onPlayerChat = function (player, message, playerName) {
         words = message.split(" ")
         switch (words[0].substring(1)) {
 
-            case "admin":
-                room.setPlayerAdmin(playerID, true);
-            break;
-
             case "nv":
             case "bb":
                 room.kickPlayer(playerID, "Nos vemos!", false);
@@ -400,20 +397,49 @@ room.onPlayerChat = function (player, message, playerName) {
                 showStats(playerID);
             break;
 
+            // Admins Only
+
             case "rr":
 
                 if(!adminsList.has(playerID)){
-                    room.sendAnnouncement(permissionMessage, null, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    room.sendAnnouncement(permissionMessage, playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
                 }
+
                 room.stopGame();
                 room.startGame();
 
             break;
 
+            case "kick":
+
+                if(!adminsList.has(playerID)){
+                    room.sendAnnouncement(permissionMessage, playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
+                }
+
+                kickBanPlayer(words, false);
+
+            break;
+
+            case "ban":
+
+                if(!adminsList.has(playerID)){
+                    room.sendAnnouncement(permissionMessage, playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
+                }
+
+                kickBanPlayer(words, true, playerID);
+
+            break;
+
+
             default:
                 room.sendAnnouncement("Comando no existente, utiliza !help para ver los comandos", null, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
 
         }
+
+        return false; // Avoid sending messages after calling a command
 
     }
 
@@ -425,7 +451,6 @@ room.onPlayerChat = function (player, message, playerName) {
 
     if(adminsList.has(playerID)){
         color = textColor.ADMIN;
-        font = textFont.BOLD;
     }
 
     room.sendAnnouncement("[" + teamEmoji + "] " + player.name + ": " + message, null, color, font, textSound.NORMAL);
@@ -433,6 +458,19 @@ room.onPlayerChat = function (player, message, playerName) {
     return false; // Don't send default message
 
 };
+
+function kickBanPlayer(words, ban, playerID){
+
+    const playerKicked = getPlayerIDbyName(words[1].substring(1));
+
+    if(playerKicked === -1){
+        room.sendAnnouncement("Jugador no encontrado", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+        return;
+    }
+    
+    room.kickPlayer(playerKicked, words.slice(2).join(' '), ban);
+
+}
 
 room.onPlayerTeamChange = function (changedPlayer, byPlayer){
 
@@ -494,6 +532,23 @@ room.onStadiumChange = function(newStadiumName, byPlayer) {
 
 
 // FUNCTIONS 
+
+function getPlayerIDbyName(name) {
+
+    const playersList = room.getPlayerList();
+
+    for (let i = 0; i < playersList.length; i++) {
+
+        playerName = playersList[i].name.replace(/ /g, '_');
+
+        if (playerName == name) {
+            return playersList[i].id;
+        }
+    }
+
+    return -1;
+
+}
 
 async function manageGoalStatsAndMessage(team){
 
@@ -586,13 +641,13 @@ function getTeamEmoji(team){
     switch(team){
 
         case SPEC:
-            return '🔵';
+            return '⚪';
 
         case RED:
             return '🔴';
 
         case BLUE:
-            return '⚪';
+            return '🔵';
 
         default:
             return '⚫';
