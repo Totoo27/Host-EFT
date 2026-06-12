@@ -44,16 +44,6 @@ async function crearJugadorRol(auth, id_rol){
 
 }
 
-/* 
-  "xp": 0,
-  "monedas": 0,
-  "partidos_jugados": 0,
-  "partidos_ganados": 0,
-  "partidos_perdidos": 0,
-  "partidos_arquero": 0,
-  "partidos_abandonados": 0 
-  */
-
 async function buscarJugador(auth){
 
     const [rows] = await database.query(

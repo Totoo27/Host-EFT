@@ -26,9 +26,9 @@ app.post("/jugador/crear", async (req, res) => {
 
     try {
 
-        const { nombre, auth } = req.body;
+        const { name, auth } = req.body;
 
-        await jugadorService.crearJugador(nombre, auth, TEMPORADA_ACTIVA);
+        await jugadorService.crearJugador(name, auth, TEMPORADA_ACTIVA);
 
         return res.status(201).json("Jugador y estadísticas creados exitosamente");
 
@@ -78,14 +78,13 @@ app.post("/VIP/crear/:auth", async (req, res) => {
 
 });
 
-app.post("/jugador-rol/crear/:auth/:rol", async (req, res) => {
+app.post("/jugador-rol/crear", async (req, res) => {
 
     try {
 
-        const jugadorAuth = req.params.auth;
-        const rolId = req.params.rol;
+        const { auth, roleID } = req.body;
 
-        await jugadorService.crearJugadorRol(jugadorAuth, rolId);
+        await jugadorService.crearJugadorRol(auth, roleID);
 
         return res.status(201).json("Jugador con rol agregado exitosamente.");
 

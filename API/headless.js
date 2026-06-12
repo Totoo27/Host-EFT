@@ -1,5 +1,5 @@
 
-// API
+// API 
 const APIPort = 4321;
 
 const stadium = `{  "name" : "EFT Map",
@@ -379,7 +379,7 @@ room.onTeamVictory = async function(scores){
 
 };
 
-room.onPlayerChat = function (player, message, playerName) {
+room.onPlayerChat = async function (player, message, playerName) {
 
     const permissionMessage = "No tenés los permisos para realizar este comando.";
     const playerID = player.id;
@@ -418,7 +418,7 @@ room.onPlayerChat = function (player, message, playerName) {
                     break;
                 }
 
-                kickBanPlayer(words, false);
+                kickBanPlayer(words, false, playerID);
 
             break;
 
@@ -429,6 +429,18 @@ room.onPlayerChat = function (player, message, playerName) {
                     break;
                 }
 
+                kickBanPlayer(words, true, playerID);
+
+            break;
+
+            case "blacklist":
+
+                if(!adminsList.has(playerID)){
+                    room.sendAnnouncement(permissionMessage, playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
+                }
+
+                addBlackList(playerID);
                 kickBanPlayer(words, true, playerID);
 
             break;
@@ -458,19 +470,6 @@ room.onPlayerChat = function (player, message, playerName) {
     return false; // Don't send default message
 
 };
-
-function kickBanPlayer(words, ban, playerID){
-
-    const playerKicked = getPlayerIDbyName(words[1].substring(1));
-
-    if(playerKicked === -1){
-        room.sendAnnouncement("Jugador no encontrado", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
-        return;
-    }
-    
-    room.kickPlayer(playerKicked, words.slice(2).join(' '), ban);
-
-}
 
 room.onPlayerTeamChange = function (changedPlayer, byPlayer){
 
@@ -547,6 +546,35 @@ function getPlayerIDbyName(name) {
     }
 
     return -1;
+
+}
+
+function kickBanPlayer(words, ban, playerID){
+
+    const kickedID = getPlayerIDbyName(words[1].substring(1));
+
+    if(kickedID === -1){
+        room.sendAnnouncement("Jugador no encontrado", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+        return;
+    }
+    
+    room.kickPlayer(kickedID, words.slice(2).join(' '), ban);
+
+}
+
+async function addBlackList(playerID){
+
+    const kickedID = getPlayerIDbyName(words[1].substring(1));
+
+    if(kickedID === -1){
+        room.sendAnnouncement("Jugador no encontrado", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+        return;
+    }
+
+    const playerAuth = getAuth(kickedID);
+    const BANNED = 5;
+
+    await API.createPlayerRole(playerAuth, BANNED);
 
 }
 
@@ -813,7 +841,7 @@ async function isRole(auth, role){
 
 const API = {
 
-    async createPlayer(nombre, auth){
+    async createPlayer(name, auth){
     
         const response = await fetch(
             `http://localhost:${APIPort}/jugador/crear`,
@@ -823,7 +851,7 @@ const API = {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    nombre,
+                    name,
                     auth
                 })
             }
@@ -835,6 +863,28 @@ const API = {
         console.log(data);
         */
     
+    },
+
+    async createPlayerRole(auth, roleID){
+
+        const response = await fetch(
+            `http://localhost:${APIPort}/jugador-rol/crear`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    auth,
+                    roleID
+                })
+            }
+        );
+
+        console.log(response.status);
+        const data = await response.text();
+        console.log(data);
+
     },
 
     async searchPlayer(auth){
