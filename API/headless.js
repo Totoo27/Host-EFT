@@ -298,6 +298,19 @@ let isGKgot = false;
 let gkRed = -1;
 let gkBlue = -1;
 
+// MVP Management
+
+let MVPstats = {};
+
+const MVPpoints = {
+
+    goal: 2,
+    assist: 1,
+    own_goal: -1,
+    clean_sheet: 3
+
+}
+
 // Game Management
 
 let isGameStarted = false;
@@ -327,6 +340,7 @@ room.onPlayerJoin = async function(player){
     }
 
     playersInfo.set(playerID, auth.toString(), player.conn.toString());
+    playersInfo.get(playerID);
 
 };
 
@@ -488,12 +502,7 @@ room.onGameStart = function (byPlayer){
 
 room.onGameStop = function () {
 
-    restartGKs();
-    playerKickBall = [
-        -1,
-        -1
-    ];
-    isGameStarted = false;
+    restartGameStats();
 
 };
 
@@ -531,6 +540,32 @@ room.onStadiumChange = function(newStadiumName, byPlayer) {
 
 
 // FUNCTIONS 
+
+function getMVP(){
+
+    let mvpID = Object.keys(MVPstats)[0];
+
+    for (const playerID in MVPstats) {
+        if (MVPstats[playerID] > MVPstats[mvpID]) {
+            mvpID = playerID;
+            
+        }
+
+    }
+
+    return parseInt(mvpID);
+
+}
+
+function addPointsMVP(playerID, points){
+
+    if (!MVPstats[playerID]) {
+        MVPstats[playerID] = 0;
+    }
+
+    MVPstats[playerID] += points;
+
+}
 
 function getPlayerIDbyName(name) {
 
@@ -592,15 +627,18 @@ async function manageGoalStatsAndMessage(team){
 
         room.sendAnnouncement("golazo de " + scorer.name, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
         await API.updatePlayerStats(scorerAuth, "goles");
+        addPointsMVP(scorer.id, MVPpoints.goal);
 
         if(assistantAuth !== -1){
             room.sendAnnouncement("asistencia de " + assistant.name, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
             await API.updatePlayerStats(assistantAuth, "asistencias");
+            addPointsMVP(assistant.id, MVPpoints.assist);
         }
 
     } else {
         room.sendAnnouncement("golazo en contra de " + scorer.name, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
         await API.updatePlayerStats(scorerAuth, "goles_en_contra");
+        addPointsMVP(scorer.id, MVPpoints.own_goal);
     }
 
 }
@@ -691,10 +729,21 @@ function movePlayer(id, x, y) {
     });
 }
 
-function restartGKs(){
+function restartGameStats(){
+    
     isGKgot = false;
     gkRed = -1;
     gkBlue = -1;
+
+    playerKickBall = [
+        -1,
+        -1
+    ];
+
+    isGameStarted = false;
+
+    MVPstats = {};
+
 }
 
 async function saveGameStats(winningTeam){
@@ -732,6 +781,7 @@ async function saveGameStats(winningTeam){
 
                 if(cleanSheet){
                     await API.updatePlayerStats(playerAuth, "vallas_invictas");
+                    addPointsMVP(playerID, MVPpoints.clean_sheet);
                 }
             }            
 
@@ -744,6 +794,9 @@ async function saveGameStats(winningTeam){
         }
         
     }
+
+    let mvpAuth = getAuth(getMVP());
+    await API.updatePlayerStats(mvpAuth, "mvps");
 }
 
 function isGK(playerID){
@@ -881,9 +934,11 @@ const API = {
             }
         );
 
+        /*
         console.log(response.status);
         const data = await response.text();
         console.log(data);
+        */
 
     },
 
@@ -927,11 +982,11 @@ const API = {
             
         )
 
-        /*
+        
         console.log(response.status);
         const data = await response.text();
         console.log(data);
-        */
+        
 
     },
 
