@@ -256,7 +256,8 @@ room.setTeamsLock(true)
 const textColor = {
     ERROR: 0xFF0000,
     NORMAL: 0xFFFFFF,
-    STATS: 0xD69D29
+    STATS: 0xD69D29,
+    ADMIN: 0x38D6D6
 };
 
 const textSound = {
@@ -307,13 +308,21 @@ room.onPlayerJoin = async function(player){
     const auth = player.auth;
     const playerID = player.id;
 
+    // Roles
+    const ADMIN = 1;
+    const BANNED = 5;
+
     if(!(await playerExists(auth))){
         await API.createPlayer(player.name, auth);
     }
 
-    if(await isAdmin(auth)){
+    if(await isRole(auth, ADMIN)){
         adminsList.add(playerID);
         room.setPlayerAdmin(playerID, true);
+    }
+
+    if(await isRole(auth, BANNED)){
+        room.kickPlayer(playerID, "[❌] Estás blacklisteado papi", true);
     }
 
     playersInfo.set(playerID, auth.toString(), player.conn.toString());
@@ -322,7 +331,7 @@ room.onPlayerJoin = async function(player){
 
 room.onPlayerLeave = async function(player){
     
-    const SPEC = 0
+    const SPEC = 0;
     const ID = player.id;
     const team = player.team;
     const auth = getAuth(ID);
@@ -349,26 +358,7 @@ room.onPlayerLeave = async function(player){
 
 room.onTeamGoal = async function(team){
 
-    // room.sendAnnouncement(playerKickBall[0].name + " Metió gol team: " + playerKickBall[0].team + " ID: " + playerKickBall[0].id, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
-
-    let assistantAuth = -1;
-    let scorerAuth = getAuth(playerKickBall[0].id);
-
-    if(playerKickBall[0].id !== playerKickBall[1].id && playerKickBall[0].team === playerKickBall[1].team){   
-        assistantAuth = getAuth(playerKickBall[1].id);
-    }
-
-    if(playerKickBall[0].team === team){
-        room.sendAnnouncement("golazo de " + playerKickBall[0].name, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
-        await API.updatePlayerStats(scorerAuth, "goles");
-        if(assistantAuth !== -1){
-            room.sendAnnouncement("asistencia de " + playerKickBall[1].name, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
-            await API.updatePlayerStats(assistantAuth, "asistencias");
-        }
-    } else {
-        room.sendAnnouncement("golazo en contra de " + playerKickBall[0].name, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
-        await API.updatePlayerStats(scorerAuth, "goles_en_contra");
-    }
+    await manageGoalStatsAndMessage(team);
 
 };
 
@@ -427,7 +417,20 @@ room.onPlayerChat = function (player, message, playerName) {
 
     }
 
-    return false;
+    // Message management
+
+    let color = textColor.NORMAL;
+    let font = textFont.NORMAL;
+    let teamEmoji = getTeamEmoji(player.team);
+
+    if(adminsList.has(playerID)){
+        color = textColor.ADMIN;
+        font = textFont.BOLD;
+    }
+
+    room.sendAnnouncement("[" + teamEmoji + "] " + player.name + ": " + message, null, color, font, textSound.NORMAL);
+
+    return false; // Don't send default message
 
 };
 
@@ -492,6 +495,45 @@ room.onStadiumChange = function(newStadiumName, byPlayer) {
 
 // FUNCTIONS 
 
+async function manageGoalStatsAndMessage(team){
+
+    const scorer = playerKickBall[0];
+    const assistant = playerKickBall[1];
+
+    const scorerAuth = getAuth(scorer.id);
+    const assistantAuth = getAssistant(scorer, assistant);
+
+    const scoredForOwnTeam = scorer.team === team;
+
+    if(scoredForOwnTeam){
+
+        room.sendAnnouncement("golazo de " + scorer.name, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
+        await API.updatePlayerStats(scorerAuth, "goles");
+
+        if(assistantAuth !== -1){
+            room.sendAnnouncement("asistencia de " + assistant.name, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
+            await API.updatePlayerStats(assistantAuth, "asistencias");
+        }
+
+    } else {
+        room.sendAnnouncement("golazo en contra de " + scorer.name, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
+        await API.updatePlayerStats(scorerAuth, "goles_en_contra");
+    }
+
+}
+
+function getAssistant(scorer, assistant){
+
+    const thereIsAssistant = scorer.id !== assistant.id && scorer.team === assistant.team;
+
+    if(thereIsAssistant){   
+        return getAuth(assistant.id);
+    }
+
+    return -1;
+
+}
+
 function getGK(team, replacement) {
 
     if (team >= 3 || team <= 0) return -1;
@@ -533,6 +575,28 @@ function getGK(team, replacement) {
     }
 
     return id;
+}
+
+function getTeamEmoji(team){
+
+    const SPEC = 0;
+    const RED = 1;
+    const BLUE = 2;
+
+    switch(team){
+
+        case SPEC:
+            return '🔵';
+
+        case RED:
+            return '🔴';
+
+        case BLUE:
+            return '⚪';
+
+        default:
+            return '⚫';
+    }
 }
 
 function movePlayer(id, x, y) {
@@ -684,10 +748,9 @@ async function playerExists(auth){
 
 }
 
-async function isAdmin(auth){
+async function isRole(auth, role){
 
-    const ADMIN = 1;
-    const player = await API.searchPlayerRole(auth, ADMIN);
+    const player = await API.searchPlayerRole(auth, role);
 
     return player !== null;
 
