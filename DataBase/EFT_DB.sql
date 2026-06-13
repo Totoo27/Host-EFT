@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS VIPs (
     fecha_inicio DATE NOT NULL,
     fecha_caducacion DATE NOT NULL,
 
-    emoji VARCHAR(10) NOT NULL,
+    prefix VARCHAR(10) NOT NULL,
     texto_entrada VARCHAR(255) NOT NULL,
     color_texto VARCHAR(7) NOT NULL,
 

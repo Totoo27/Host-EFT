@@ -342,7 +342,14 @@ room.onPlayerJoin = async function(player){
     }
 
     const SPEC = 0;
-    updateTeamsChange(SPEC, playerID);
+
+    if(!areEnoughPlayers()){
+        fillEmptiestTeam(playerID);
+    } else {
+        // Stays on spectator
+        updateTeamsChange(SPEC, playerID);
+    }
+
     playersInfo.set(playerID, auth.toString(), player.conn.toString());
     playersInfo.get(playerID);
 
@@ -350,28 +357,13 @@ room.onPlayerJoin = async function(player){
 
 room.onPlayerLeave = async function(player){
     
-    const SPEC = 0;
-    const ID = player.id;
-    const team = player.team;
-    const auth = getAuth(ID);
+    await managePlayerLeft(player);
 
-    if(team !== SPEC && isGameStarted){
-        await API.updatePlayerStats(auth, "partidos_abandonados");
-    }
+};
 
-    updateTeamsQuit(team, ID);
+room.onPlayerKicked = async function (kickedPlayer, reason, ban, byPlayer) {
 
-    if (adminsList.has(player.id)){
-        adminsList.delete(player.id);
-    }
-
-    if(ID === gkBlue){
-        gkBlue = getGK(2, true);
-    }else if(ID === gkRed){
-        gkRed = getGK(1, true);
-    }
-
-    delete playersInfo[ID];
+    await managePlayerLeft(kickedPlayer);
 
 };
 
@@ -543,7 +535,7 @@ room.onStadiumChange = function(newStadiumName, byPlayer) {
     
     if (!admins_ofi.has(byPlayer.id)) {
         room.sendAnnouncement("No se puede cambiar de mapa", byPlayer.id, cor[indexCor.get("rojo")], "bold", sonido[2])
-        room.setCustomStadium(stadium); // Restaurar el estadio del host
+        room.setCustomStadium(stadium);
     }
 };
 
@@ -583,6 +575,25 @@ function getTeamResult(scores){
     return {
         winner,
         loser
+    }
+
+}
+
+function fillEmptiestTeam(playerID){
+
+    const RED = 1;
+    const BLUE = 2;
+
+    if(playersTeam[RED].size <= playersTeam[BLUE].size){
+
+        updateTeamsChange(RED, playerID);
+        room.setPlayerTeam(playerID, RED);
+
+    } else {
+
+        updateTeamsChange(BLUE, playerID);
+        room.setPlayerTeam(playerID, BLUE);
+
     }
 
 }
@@ -722,6 +733,8 @@ async function addBlackList(playerID){
 
     await API.createPlayerRole(playerAuth, BANNED);
 
+    room.sendAnnouncement("[🚧] Jugador blacklisteado correctamente.", playerID, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT);
+
 }
 
 async function manageGoalStatsAndMessage(team){
@@ -774,7 +787,7 @@ function getGK(team, replacement) {
     let firstPlayer = playersTeam[team].values().next().value
     if (playersTeam[team].size == 1) return firstPlayer;
 
-    // Definir arco según equipo
+    // Define arch position
     let archPositionX;
     if (team == 1) {
         archPositionX = -700;
@@ -782,13 +795,13 @@ function getGK(team, replacement) {
         archPositionX = 700;
     }
 
-    // Inicializar con el primero
+    // start the search with the first one
     let id = firstPlayer;
     let lesserDistance = Math.abs(
         room.getPlayer(id).position.x - archPositionX
     );
 
-    // Buscar el más cercano al arco
+    // Search the nearbiest player to the arch
     for (const playerID of playersTeam[team]) {
 
         let distance = Math.abs(
@@ -801,7 +814,7 @@ function getGK(team, replacement) {
         }
     }
 
-    // Mover unicamente si es al principio del partido
+    // Only move at the start of the game
     if(!replacement){
         movePlayer(id, arcoX, -10);
     }
@@ -974,8 +987,6 @@ function getAuth(playerId) {
 
 function areEnoughPlayers(){
 
-    return true;
-
     const RED = 1;
     const BLUE = 2;
     const PLAYER_AMOUNT = 4;
@@ -985,6 +996,33 @@ function areEnoughPlayers(){
     }
 
     return true;
+
+}
+
+async function managePlayerLeft(player){
+
+    const SPEC = 0;
+    const ID = player.id;
+    const team = player.team;
+    const auth = getAuth(ID);
+
+    if(team !== SPEC && isGameStarted){
+        await API.updatePlayerStats(auth, "partidos_abandonados");
+    }
+
+    updateTeamsQuit(team, ID);
+
+    if (adminsList.has(ID)){
+        adminsList.delete(ID);
+    }
+
+    if(ID === gkBlue){
+        gkBlue = getGK(2, true);
+    }else if(ID === gkRed){
+        gkRed = getGK(1, true);
+    }
+
+    delete playersInfo[ID];
 
 }
 
