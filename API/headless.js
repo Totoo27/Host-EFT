@@ -293,6 +293,8 @@ let playerKickBall = [
     -1
     ];
 
+let playersAFK = new Set();
+
 // GoalKeeper Management
 let isGKgot = false; 
 let gkRed = -1;
@@ -339,6 +341,8 @@ room.onPlayerJoin = async function(player){
         room.kickPlayer(playerID, "[❌] Estás blacklisteado papi", true);
     }
 
+    const SPEC = 0;
+    updateTeamsChange(SPEC, playerID);
     playersInfo.set(playerID, auth.toString(), player.conn.toString());
     playersInfo.get(playerID);
 
@@ -379,17 +383,22 @@ room.onTeamGoal = async function(team){
 
 room.onTeamVictory = async function(scores){
 
-    const RED = 1;
-    const BLUE = 2;
-    let winningTeam = -1;
-
-    if(scores.red > scores.blue){
-        winningTeam = RED;
-    } else if (scores.blue > scores.red){
-        winningTeam = BLUE;
-    }
+    const result = getTeamResult(scores);
+    const winningTeam = result.winner;
+    const loosingTeam = result.loser;
 
     await saveGameStats(winningTeam);
+
+    autoStop();
+
+    const RED = 1;
+    const BLUE = 2;
+
+    moveLosersToSpec(loosingTeam);
+    if(winningTeam === BLUE){
+        movePlayersToStreak(BLUE, RED);
+    }
+    moveSpecToTeam(BLUE);
 
 };
 
@@ -538,8 +547,110 @@ room.onStadiumChange = function(newStadiumName, byPlayer) {
     }
 };
 
-
 // FUNCTIONS 
+
+async function autoStop(){
+
+    const cooldown = 5000;
+
+    room.stopGame();
+    room.sendAnnouncement("Comenzando proximo partido pronto...");
+    await delay(cooldown);
+    room.startGame();
+
+}
+
+function delay(time) {
+    return new Promise(resolve => setTimeout(resolve, time));
+}
+
+function getTeamResult(scores){
+
+    const RED = 1;
+    const BLUE = 2;
+
+    let winner = -1;
+    let loser = -1;
+
+    if(scores.red > scores.blue){
+        winner = RED;
+        loser = BLUE;
+    } else if (scores.blue > scores.red){
+        winner = BLUE;
+        loser = RED;
+    }
+
+    return {
+        winner,
+        loser
+    }
+
+}
+
+function moveSpecToTeam(team){
+    
+    if(team === -1){
+        return;
+    }
+
+    const SPEC = 0;
+    const MAX_PLAYERS = 1;
+    let i = 0;
+
+    const players = [...playersTeam[SPEC]];
+
+    for(const playerID of players){
+
+        if(i >= MAX_PLAYERS){
+            break;
+        }
+
+        if(playersAFK.has(playerID)){
+            continue;
+        }
+
+        room.setPlayerTeam(playerID, team);
+        updateTeamsChange(team, playerID);
+
+        i++;
+
+    }
+
+}
+
+function movePlayersToStreak(team, toTeam){
+
+    if(team === -1 || toTeam === -1){
+        return;
+    }
+
+    const players = [...playersTeam[team]];
+    
+    for(const playerID of players){
+        room.setPlayerTeam(playerID, toTeam);
+        updateTeamsChange(toTeam, playerID);
+
+    };
+
+}
+
+function moveLosersToSpec(loosingTeam) {
+
+    if(loosingTeam === -1){
+        return;
+    }
+
+    const SPEC = 0;
+    const players = [...playersTeam[loosingTeam]];
+    
+    for(const playerID of players){
+
+        room.setPlayerTeam(playerID, SPEC);
+        updateTeamsChange(SPEC, playerID);
+
+    };
+
+}
 
 function getMVP(){
 
@@ -960,6 +1071,22 @@ const API = {
 
     },
 
+    async searchPlayerRole(auth, role){
+
+        const response = await fetch(
+            `http://localhost:${APIPort}/jugador-rol/buscar/${auth}/${role}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+            }
+        )
+
+        return await response.json();
+
+    },
+
     async updatePlayerStats(auth, stat){
 
         if(!areEnoughPlayers()){
@@ -982,27 +1109,11 @@ const API = {
             
         )
 
-        
+        /*
         console.log(response.status);
         const data = await response.text();
         console.log(data);
-        
-
-    },
-
-    async searchPlayerRole(auth, role){
-
-        const response = await fetch(
-            `http://localhost:${APIPort}/jugador-rol/buscar/${auth}/${role}`,
-            {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-            }
-        )
-
-        return await response.json();
+        */
 
     }
 
