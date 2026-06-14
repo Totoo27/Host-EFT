@@ -11,6 +11,7 @@ const jugadorService = require('./services/jugadorService');
 const clubService = require('./services/clubService');
 const statsService = require('./services/statsService');
 const remeraService = require('./services/remeraService');
+const frasesService = require('./services/frasesService')
 
 const TEMPORADA_ACTIVA = 1;
 
@@ -90,6 +91,24 @@ app.post("/jugador-rol/crear", async (req, res) => {
         return res.status(201).json("Jugador con rol agregado exitosamente.");
 
     } catch(err){
+
+        return res.status(500).json(err);
+
+    }
+
+});
+
+app.get("/frases/buscar/:tipoFrase", async (req, res) => {
+
+    try {
+
+        const tipoFrase = req.params.tipoFrase;
+
+        const result = await frasesService.buscarFrasesDeTipo(tipoFrase);
+
+        return res.status(200).json(result);
+
+    } catch(err) {
 
         return res.status(500).json(err);
 

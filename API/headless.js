@@ -252,7 +252,7 @@ var room = HBInit({
 room.setCustomStadium(stadium);
 room.setScoreLimit(scoreLimit);
 room.setTimeLimit(timeLimit);
-room.setTeamsLock(true)
+room.setTeamsLock(true);
 
 // Announcements
 
@@ -261,7 +261,10 @@ const textColor = {
     NORMAL: 0xFFFFFF,
     STATS: 0xD69D29,
     ADMIN: 0x38D6D6,
-    SUCCESS: 0x58C78E
+    SUCCESS: 0x58C78E,
+    GAME: 0xEDE06D,
+    RED: 0xFF6363,
+    BLUE: 0x708DFF
 };
 
 const textSound = {
@@ -379,7 +382,7 @@ room.onPlayerKicked = async function (kickedPlayer, reason, ban, byPlayer) {
 
 room.onTeamGoal = async function(team){
 
-    await manageGoalStatsAndMessage(team);
+    await manageGoalStatsAndDisplay(team);
 
 };
 
@@ -404,7 +407,7 @@ room.onTeamVictory = async function(scores){
 
 };
 
-room.onPlayerChat = async function (player, message, playerName) {
+room.onPlayerChat = function (player, message, playerName) {
 
     const permissionMessage = "No tenés los permisos para realizar este comando.";
     const playerID = player.id;
@@ -557,6 +560,7 @@ async function initJerseys(){
 
     const jerseyAmount = await API.getAmountJerseys();
 
+    let jerseyNames = ["", ""];
     let randomJerseyID = [-1, -1];
 
     randomJerseyID[0] = randomIntFromInterval(1, jerseyAmount);
@@ -579,7 +583,12 @@ async function initJerseys(){
             jersey.slice(2).map(c => parseInt(c, 16))
         );
 
+        jerseyNames[i-1] = jerseyData.nombre;
+
     }
+
+    room.sendAnnouncement("[🔰] PARTIDO:", null, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
+    room.sendAnnouncement("[🔴] " + jerseyNames[0] + " VS " + jerseyNames[1] + " [🔵]", null, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
 
 }
 
@@ -779,7 +788,7 @@ async function addBlackList(playerID){
 
 }
 
-async function manageGoalStatsAndMessage(team){
+async function manageGoalStatsAndDisplay(team){
 
     const scorer = playerKickBall[0];
     const assistant = playerKickBall[1];
@@ -789,23 +798,40 @@ async function manageGoalStatsAndMessage(team){
 
     const scoredForOwnTeam = scorer.team === team;
 
+    let goalEmoji = "⚽";
+
+    const RED = 1;
+    let color = team === RED ? textColor.RED : textColor.BLUE;
+
     if(scoredForOwnTeam){
 
-        room.sendAnnouncement("golazo de " + scorer.name, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
+        room.sendAnnouncement("["+ goalEmoji +"] " + await getPhrase(scorer.name, 'gol'), null, color, textFont.NORMAL, textSound.IMPORTANT);
         await API.updatePlayerStats(scorerAuth, "goles");
         addPointsMVP(scorer.id, MVPpoints.goal);
 
         if(assistantAuth !== -1){
-            room.sendAnnouncement("asistencia de " + assistant.name, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
+            room.sendAnnouncement("[👟] " + await getPhrase(assistant.name, 'asistencia'), null, color, textFont.NORMAL, textSound.IMPORTANT);
             await API.updatePlayerStats(assistantAuth, "asistencias");
             addPointsMVP(assistant.id, MVPpoints.assist);
         }
 
     } else {
-        room.sendAnnouncement("golazo en contra de " + scorer.name, null, textColor.NORMAL, textFont.BOLD, textSound.IMPORTANT);
+        room.sendAnnouncement("[🤡] " + await getPhrase(scorer.name, 'gol_en_contra'), null, color, textFont.NORMAL, textSound.IMPORTANT);
         await API.updatePlayerStats(scorerAuth, "goles_en_contra");
         addPointsMVP(scorer.id, MVPpoints.own_goal);
     }
+
+}
+
+async function getPhrase(name, type){
+
+    const phrasesData = await API.getPhrasesByType(type);
+
+    const randomPhrase = phrasesData[randomIntFromInterval(0, phrasesData.length - 1)].frase;
+
+    const phrase = randomPhrase.replaceAll("{player}", name);
+
+    return phrase;    
 
 }
 
@@ -858,7 +884,7 @@ function getGK(team, replacement) {
 
     // Only move at the start of the game
     if(!replacement){
-        movePlayer(id, arcoX, -10);
+        movePlayer(id, archPositionX, -10);
     }
 
     return id;
@@ -1083,7 +1109,12 @@ async function isRole(auth, role){
 
 }
 
-function randomIntFromInterval(min, max) { // min and max included
+function randomIntFromInterval(min, max) {
+
+    if(min > max){
+        throw new Error("El minimo no puede ser mayor al maximo");
+    }
+
     return Math.floor(Math.random() * (max - min + 1) + min)
 }
 
@@ -1159,6 +1190,22 @@ const API = {
 
         const response = await fetch(
             `http://localhost:${APIPort}/jugador-rol/buscar/${auth}/${role}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+            }
+        )
+
+        return await response.json();
+
+    },
+
+    async getPhrasesByType(tipoFrase){
+
+        const response = await fetch(
+            `http://localhost:${APIPort}/frases/buscar/${tipoFrase}`,
             {
                 method: "GET",
                 headers: {
