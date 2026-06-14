@@ -10,6 +10,7 @@ const port = 4321;
 const jugadorService = require('./services/jugadorService');
 const clubService = require('./services/clubService');
 const statsService = require('./services/statsService');
+const remeraService = require('./services/remeraService');
 
 const TEMPORADA_ACTIVA = 1;
 
@@ -89,6 +90,40 @@ app.post("/jugador-rol/crear", async (req, res) => {
         return res.status(201).json("Jugador con rol agregado exitosamente.");
 
     } catch(err){
+
+        return res.status(500).json(err);
+
+    }
+
+});
+
+app.get("/remera/buscar/:id", async (req, res) => {
+
+    try {
+
+        const id = req.params.id;
+
+        const result = await remeraService.buscarRemera(id);
+
+        return res.status(200).json(result);
+
+    } catch(err) {
+
+        return res.status(500).json(err);
+
+    }
+
+});
+
+app.get("/remera/cantidad", async (req, res) => {
+
+    try {
+
+        const result = await remeraService.getCantRemeras();
+
+        return res.status(200).json(result);
+
+    } catch(err) {
 
         return res.status(500).json(err);
 

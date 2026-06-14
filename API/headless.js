@@ -1,11 +1,12 @@
 
 // API 
+
 const APIPort = 4321;
 
 const stadium = `{  "name" : "EFT Map",
     "width" : 800,
     "height" : 350,
-    "bg" : { "type" : "grass", "color" : "404447", "cornerRadius" : 0, "kickOffRadius" : 0 },
+    "bg" : { "type" : "grass", "color" : "666666", "cornerRadius" : 0, "kickOffRadius" : 0 },
 "vertexes" : [
         /* 0 */ { "x" : -700, "y" : 321, "cMask" : ["ball" ] },
         /* 1 */ { "x" : -700, "y" : -319, "cMask" : ["ball" ] },
@@ -234,6 +235,7 @@ const stadium = `{  "name" : "EFT Map",
     "traits" : {}}`;
 
 // Init Room
+
 const roomName = "El futbol de Toto";
 const maxPlayers = 20;
 const scoreLimit = 4;
@@ -246,6 +248,7 @@ var room = HBInit({
     public: false,
     geo: {code: "ar", lat: -36, lon:-59.9964}
 });
+
 room.setCustomStadium(stadium);
 room.setScoreLimit(scoreLimit);
 room.setTimeLimit(timeLimit);
@@ -296,6 +299,7 @@ let playerKickBall = [
 let playersAFK = new Set();
 
 // GoalKeeper Management
+
 let isGKgot = false; 
 let gkRed = -1;
 let gkBlue = -1;
@@ -318,6 +322,12 @@ const MVPpoints = {
 let isGameStarted = false;
 
 // EVENTS
+
+room.onRoomLink = async function(){
+
+    room.startGame();
+
+};
 
 room.onPlayerJoin = async function(player){
 
@@ -497,7 +507,9 @@ room.onPlayerBallKick = function (player) {
     playerKickBall[0] = player
 };
 
-room.onGameStart = function (byPlayer){
+room.onGameStart = async function (byPlayer){
+
+    await initJerseys();
 
 };
 
@@ -533,13 +545,43 @@ room.onGameTick = function(){
 room.onStadiumChange = function(newStadiumName, byPlayer) {
     if (newStadiumName === "EFT Map") return;
     
-    if (!admins_ofi.has(byPlayer.id)) {
-        room.sendAnnouncement("No se puede cambiar de mapa", byPlayer.id, cor[indexCor.get("rojo")], "bold", sonido[2])
+    if (!adminsList.has(byPlayer.id)) {
+        room.sendAnnouncement("No se puede cambiar de mapa", byPlayer.id, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
         room.setCustomStadium(stadium);
     }
 };
 
 // FUNCTIONS 
+
+async function initJerseys(){
+
+    const jerseyAmount = await API.getAmountJerseys();
+
+    let randomJerseyID = [-1, -1];
+
+    randomJerseyID[0] = randomIntFromInterval(1, jerseyAmount);
+
+    do{
+
+        randomJerseyID[1] = randomIntFromInterval(1, jerseyAmount);
+
+    }while(randomJerseyID[0] == randomJerseyID[1] && jerseyAmount > 1);
+
+    for(let i = 1; i < playersTeam.length; i++){
+
+        let jerseyData = await API.searchJerseyByID(randomJerseyID[i-1]);
+        let jersey = JSON.parse(jerseyData.color);
+
+        room.setTeamColors(
+            i,
+            jersey[0],
+            parseInt(jersey[1], 16),
+            jersey.slice(2).map(c => parseInt(c, 16))
+        );
+
+    }
+
+}
 
 async function autoStop(){
 
@@ -1041,6 +1083,10 @@ async function isRole(auth, role){
 
 }
 
+function randomIntFromInterval(min, max) { // min and max included
+    return Math.floor(Math.random() * (max - min + 1) + min)
+}
+
 const API = {
 
     async createPlayer(name, auth){
@@ -1122,6 +1168,41 @@ const API = {
         )
 
         return await response.json();
+
+    },
+
+    async searchJerseyByID(id){
+
+        const response = await fetch(
+            `http://localhost:${APIPort}/remera/buscar/${id}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+            }
+        )
+
+        return await response.json();
+
+    },
+
+    async getAmountJerseys(){
+
+        const response = await fetch(
+            `http://localhost:${APIPort}/remera/cantidad`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+            }
+        )
+
+        const data = await response.json();
+        const amount = parseInt(data.cantidad);
+
+        return amount;
 
     },
 

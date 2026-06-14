@@ -46,8 +46,8 @@ CREATE TABLE IF NOT EXISTS Remeras (
 
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(40) NOT NULL,
-    color VARCHAR(7) NOT NULL,
-    club_id INT NOT NULL,
+    color JSON NOT NULL,
+    club_id INT NULL,
 
     FOREIGN KEY (club_id) REFERENCES Clubes(id) ON DELETE CASCADE
 
