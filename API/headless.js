@@ -6,7 +6,7 @@ const APIPort = 4321;
 const stadium = `{  "name" : "EFT Map",
     "width" : 800,
     "height" : 350,
-    "bg" : { "type" : "grass", "color" : "666666", "cornerRadius" : 0, "kickOffRadius" : 0 },
+    "bg" : { "type" : "grass", "color" : "444444", "cornerRadius" : 0, "kickOffRadius" : 0 },
 "vertexes" : [
         /* 0 */ { "x" : -700, "y" : 321, "cMask" : ["ball" ] },
         /* 1 */ { "x" : -700, "y" : -319, "cMask" : ["ball" ] },
@@ -236,7 +236,7 @@ const stadium = `{  "name" : "EFT Map",
 
 // Init Room
 
-const roomName = "El futbol de Toto";
+const roomName = "[⚡] x4 - El futbol de Toto [T1] [⚡]";
 const maxPlayers = 20;
 const scoreLimit = 4;
 const timeLimit = 4;
@@ -324,6 +324,59 @@ const MVPpoints = {
 
 let isGameStarted = false;
 
+// Ranks management
+
+const RANKS = [
+    {
+        name: "CONO",
+        display: "👻CONO",
+        min: -Infinity,
+        max: -5
+    },
+    {
+        name: "BRONCE",
+        display: "🟤BRONCE",
+        min: -5,
+        max: 100
+    },
+    {
+        name: "PLATA",
+        display: "⚪PLATA",
+        min: 100,
+        max: 250
+    },
+    {
+        name: "ORO",
+        display: "🟡ORO",
+        min: 250,
+        max: 500
+    },
+    {
+        name: "PLATINO",
+        display: "🔵PLATINO",
+        min: 500,
+        max: 1000
+    },
+    {
+        name: "DIAMANTE",
+        display: "🟣DIAMANTE",
+        min: 1000,
+        max: 1500
+    },
+    {
+        name: "ESMERALDA",
+        display: "🟢ESMERALDA",
+        min: 1500,
+        max: 2000
+    },
+    {
+        name: "LEGEND",
+        display: "💠LEGEND",
+        min: 2000,
+        max: Infinity
+    }
+];
+
 // EVENTS
 
 room.onRoomLink = async function(){
@@ -344,6 +397,7 @@ room.onPlayerJoin = async function(player){
     if(!(await playerExists(auth))){
         await API.createPlayer(player.name, auth);
     }
+    const stats = await API.searchPlayer(auth);
 
     if(await isRole(auth, ADMIN)){
         adminsList.add(playerID);
@@ -363,8 +417,12 @@ room.onPlayerJoin = async function(player){
         updateTeamsChange(SPEC, playerID);
     }
 
-    playersInfo.set(playerID, auth.toString(), player.conn.toString());
-    playersInfo.get(playerID);
+    playersInfo.set(playerID, {
+        auth: auth.toString(),
+        conn: player.conn.toString(),
+        rank: (await getRank(stats)).toString(),
+        rankMessage: (await getRankMessage(stats)).toString()
+    });
 
 };
 
@@ -425,6 +483,10 @@ room.onPlayerChat = function (player, message, playerName) {
                 showStats(playerID);
             break;
 
+            case "rank":
+                showRank(playerID);
+            break;
+
             // Admins Only
 
             case "rr":
@@ -479,7 +541,7 @@ room.onPlayerChat = function (player, message, playerName) {
 
         }
 
-        return false; // Avoid sending messages after calling a command
+        return false; // Avoid sending messages after calling commands
 
     }
 
@@ -488,12 +550,13 @@ room.onPlayerChat = function (player, message, playerName) {
     let color = textColor.NORMAL;
     let font = textFont.NORMAL;
     let teamEmoji = getTeamEmoji(player.team);
+    let rank = playersInfo.get(playerID).rank;
 
     if(adminsList.has(playerID)){
         color = textColor.ADMIN;
     }
 
-    room.sendAnnouncement("[" + teamEmoji + "] " + player.name + ": " + message, null, color, font, textSound.NORMAL);
+    room.sendAnnouncement("[" + teamEmoji + "]" + "["+ rank +"] " +  player.name + ": " + message, null, color, font, textSound.NORMAL);
 
     return false; // Don't send default message
 
@@ -798,27 +861,29 @@ async function manageGoalStatsAndDisplay(team){
 
     const scoredForOwnTeam = scorer.team === team;
 
-    let goalEmoji = "⚽";
-
     const RED = 1;
     let color = team === RED ? textColor.RED : textColor.BLUE;
 
     if(scoredForOwnTeam){
 
-        room.sendAnnouncement("["+ goalEmoji +"] " + await getPhrase(scorer.name, 'gol'), null, color, textFont.NORMAL, textSound.IMPORTANT);
+        room.sendAnnouncement("[⚽] " + await getPhrase(scorer.name, 'gol'), null, color, textFont.NORMAL, textSound.IMPORTANT);
         await API.updatePlayerStats(scorerAuth, "goles");
         addPointsMVP(scorer.id, MVPpoints.goal);
 
-        if(assistantAuth !== -1){
+        if(assistantAuth !== -1){ // Assist
+
             room.sendAnnouncement("[👟] " + await getPhrase(assistant.name, 'asistencia'), null, color, textFont.NORMAL, textSound.IMPORTANT);
             await API.updatePlayerStats(assistantAuth, "asistencias");
             addPointsMVP(assistant.id, MVPpoints.assist);
+
         }
 
-    } else {
+    } else { // own Goal
+
         room.sendAnnouncement("[🤡] " + await getPhrase(scorer.name, 'gol_en_contra'), null, color, textFont.NORMAL, textSound.IMPORTANT);
         await API.updatePlayerStats(scorerAuth, "goles_en_contra");
         addPointsMVP(scorer.id, MVPpoints.own_goal);
+
     }
 
 }
@@ -997,7 +1062,7 @@ function isGK(playerID){
 
 async function showStats(playerID){
 
-    let auth = getAuth(playerID);
+    const auth = getAuth(playerID);
 
     if(!(await playerExists(auth))){
         room.sendAnnouncement("ERROR: No estas cargado en la base de datos", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
@@ -1018,7 +1083,198 @@ async function showStats(playerID){
     `, null, textColor.STATS, textFont.SMALL, textSound.NORMAL
     );
 
+    console.log(await getRank(player));
+
 }
+
+async function showRank(playerID){
+
+    const auth = getAuth(playerID);
+
+    if(!(await playerExists(auth))){
+        room.sendAnnouncement("ERROR: No estas cargado en la base de datos", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+        return;
+    }
+
+    const player = await API.searchPlayer(auth);
+    const rankMessage = playersInfo.get(playerID).rankMessage;
+
+    room.sendAnnouncement("--- Rango de " + player.nombre + " ---", null, textColor.STATS, textFont.NORMAL, textSound.MUTE);
+    room.sendAnnouncement(rankMessage, null, textColor.STATS, textFont.NORMAL, textSound.NORMAL);
+
+
+}
+
+async function getRankProgress(player) {
+
+    const XP = player.xp;
+
+    const rank = RANKS.find(
+        rank => XP >= rank.min && XP < rank.max
+    );
+
+    if (!rank) {
+        return null;
+    }
+
+    const currentRank = (await getRank(player)).toString();
+
+    if (rank.name === "LEGEND") {
+        return {
+            currentRank,
+            nextRank: "MAX",
+            currentXP: XP,
+            nextXP: XP,
+            progress: 1
+        };
+    }
+
+    if (rank.name === "CONO") {
+        return {
+            currentRank,
+            nextRank: RANKS[1].display,
+            currentXP: XP,
+            nextXP: rank.max,
+            progress: 1
+        };
+    }
+
+    const LEVEL_AMOUNT = 5;
+    const totalXP = rank.max - rank.min;
+    const xpPerDivision = totalXP / LEVEL_AMOUNT;
+
+    let rankLevel = 0;
+
+    for (let i = 1; i <= LEVEL_AMOUNT; i++) {
+        const threshold = rank.min + (i - 1) * xpPerDivision;
+
+        if (XP >= threshold) {
+            rankLevel++;
+        }
+    }
+
+    const currentDivisionMin =
+        rank.min + (rankLevel - 1) * xpPerDivision;
+
+    const currentDivisionMax =
+        rankLevel === LEVEL_AMOUNT
+            ? rank.max
+            : rank.min + rankLevel * xpPerDivision;
+
+    let nextRank;
+
+    if (rankLevel < LEVEL_AMOUNT) {
+        nextRank =
+            rank.display +
+            " " +
+            getRankByInt(rankLevel + 1);
+    } else {
+        nextRank =
+            RANKS.find(r => r.min === rank.max)?.display ??
+            "MAX";
+    }
+
+    const progress =
+        (XP - currentDivisionMin) /
+        (currentDivisionMax - currentDivisionMin);
+
+    return {
+        currentRank,
+        nextRank,
+        currentXP: XP,
+        nextXP: currentDivisionMax,
+        progress
+    };
+}
+
+function generateXPBar(progress, size = 11) {
+    const filled = Math.floor(progress * size);
+
+    return (
+        "█ ".repeat(filled) +
+        ". ".repeat(size - filled)
+    ).trim();
+}
+
+async function getRankMessage(player) {
+    const info = await getRankProgress(player);
+
+    const bar = generateXPBar(info.progress);
+
+    let xpLine;
+
+    if (info.nextRank === "MAX") {
+        xpLine = `[ ${info.currentXP} ]`;
+    } else {
+        xpLine = ` ${info.currentXP} / ${info.nextXP}]`;
+    }
+
+    return (
+        `${info.currentRank} ` +
+        `[ ${bar} ] ` +
+        `${info.nextRank}\n` +
+        `Progreso XP: ${xpLine}`
+    );
+}
+
+async function getRank(player){
+
+    const XP = player.xp;
+
+    const rank = RANKS.find(
+        rank => XP >= rank.min && XP < rank.max
+    );
+
+    let rankName = rank.name
+
+    if(rankName == "LEGEND" || rankName == "CONO"){
+        return rank.display;
+    }
+    
+    let rankLevel = 0;
+    const LEVEL_AMOUNT = 5;
+    const total = rank.max - rank.min;
+    const xpPerDivision = total / LEVEL_AMOUNT;
+
+    for(let i=1; i<=LEVEL_AMOUNT; i++){
+
+        const divisionThreshold = rank.min + (i - 1) * xpPerDivision;
+
+        if (XP >= divisionThreshold) {
+            rankLevel++;
+        }
+
+    }
+
+    return rank.display + ' ' + getRankByInt(rankLevel);
+
+}
+
+function getRankByInt(level){
+
+    switch(level){
+
+    case 1:
+        return "I";
+
+    case 2:
+        return "II";
+
+    case 3:
+        return "III";
+
+    case 4:
+        return "IV";
+
+    case 5:
+        return "V";
+
+    default: 
+        return " ";
+
+    }
+
+}   
 
 function updateTeamsChange(team, playerID) {  
 
@@ -1050,7 +1306,9 @@ function getAuth(playerId) {
         return -1;
     }
 
-    return playersInfo.get(playerId);
+    const playerInfo = playersInfo.get(playerId);
+
+    return playerInfo.auth;
 }
 
 function areEnoughPlayers(){
@@ -1274,6 +1532,15 @@ const API = {
             }
             
         )
+
+        // update cache of player rank
+
+        const player = playersInfo.get(auth);
+        const stats = await API.searchPlayer(auth);
+        player.rank = (await getRank(stats)).toString(),
+        player.rankMessage = (await getRankMessage(player)).toString();
+
+        // If players club is not null, then save stats into his club
 
         /*
         console.log(response.status);
