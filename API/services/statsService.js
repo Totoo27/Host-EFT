@@ -51,12 +51,12 @@ const estadisticasValidas = [
 
 ];
 
-async function agregarEstadisticaJugador(estadistica, auth, temporada){
+async function agregarEstadisticaJugador(estadistica, auth, temporada, extra){
 
     existeEstadistica(estadistica);
     await existeJugador(auth);
 
-    const gananciaXP = GANANCIA_XP[estadistica] ?? 0;
+    const gananciaXP = obtenerXP(estadistica, extra);
     const gananciaMonedas = GANANCIA_MONEDAS[estadistica] ?? 0;
 
     await database.query(
@@ -72,12 +72,12 @@ async function agregarEstadisticaJugador(estadistica, auth, temporada){
 
 }
 
-async function agregarEstadisticaClub(estadistica, id, temporada){
+async function agregarEstadisticaClub(estadistica, id, temporada, extra){
 
     existeEstadistica(estadistica);
     await existeClub(id);
 
-    const gananciaXP = GANANCIA_XP[estadistica] ?? 0;
+    const gananciaXP = obtenerXP(estadistica, extra);
     const gananciaMonedas = GANANCIA_MONEDAS[estadistica] ?? 0;
 
     await database.query(
@@ -98,6 +98,17 @@ function existeEstadistica(estadistica){
         console.log("Estadistica no existente" + estadistica);
         throw new Error("Estadistica no existente");
     }
+}
+
+function obtenerXP(estadistica, extra){
+
+    if(extra === true && (estadistica == 'goles' || estadistica == 'asistencias')){
+        return GANANCIA_XP[estadistica] + 1;
+    }
+
+    return GANANCIA_XP[estadistica];
+
+    return XP ?? 0;
 }
 
 module.exports = {

@@ -13,7 +13,12 @@ INSERT INTO JugadoresRoles (jugador_auth, rol_id) VALUES
 
 INSERT INTO Remeras (nombre, color) VALUES
 ('Boca Juniors', '[90, "FFFFFF", "0019BF", "FFA733", "0019BF"]'),
-('River Plate', '[60, "000000", "FFFFFF", "C92020", "FFFFFF"]');
+('River Plate', '[60, "000000", "FFFFFF", "C92020", "FFFFFF"]'),
+/*
+('Argentina', '[60, "000000", "FFFFFF", "C92020", "FFFFFF"]'),
+('Brasil', '[60, "000000", "FFFFFF", "C92020", "FFFFFF"]'),
+('Francia', '[60, "000000", "FFFFFF", "C92020", "FFFFFF"]'),
+*/
 
 INSERT INTO frases (frase, tipo_frase) VALUES
 ("{player} metió un golazo", 'gol'),

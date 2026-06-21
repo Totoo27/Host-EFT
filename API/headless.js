@@ -3,6 +3,8 @@
 
 const APIPort = 4321;
 
+// Stadium
+
 const stadium = `{  "name" : "EFT Map",
     "width" : 800,
     "height" : 350,
@@ -236,6 +238,7 @@ const stadium = `{  "name" : "EFT Map",
 
 // Init Room
 
+document.title = '⚡ x4 - EFT ⚡';
 const roomName = "[⚡] x4 - El futbol de Toto [T1] [⚡]";
 const maxPlayers = 20;
 const scoreLimit = 4;
@@ -324,6 +327,12 @@ const MVPpoints = {
 
 let isGameStarted = false;
 
+// Team constants
+
+const SPEC = 0;
+const RED = 1;
+const BLUE = 2;
+
 // Ranks management
 
 const RANKS = [
@@ -361,18 +370,18 @@ const RANKS = [
         name: "DIAMANTE",
         display: "🟣DIAMANTE",
         min: 1000,
-        max: 1500
+        max: 2000
     },
     {
         name: "ESMERALDA",
         display: "🟢ESMERALDA",
-        min: 1500,
-        max: 2000
+        min: 2000,
+        max: 3000
     },
     {
         name: "LEGEND",
         display: "💠LEGEND",
-        min: 2000,
+        min: 3000,
         max: Infinity
     }
 ];
@@ -407,8 +416,6 @@ room.onPlayerJoin = async function(player){
     if(await isRole(auth, BANNED)){
         room.kickPlayer(playerID, "[❌] Estás blacklisteado papi", true);
     }
-
-    const SPEC = 0;
 
     if(!areEnoughPlayers()){
         fillEmptiestTeam(playerID);
@@ -453,9 +460,6 @@ room.onTeamVictory = async function(scores){
     await saveGameStats(winningTeam);
 
     autoStop();
-
-    const RED = 1;
-    const BLUE = 2;
 
     moveLosersToSpec(loosingTeam);
     if(winningTeam === BLUE){
@@ -587,9 +591,6 @@ room.onGameStop = function () {
 
 room.onGameTick = function(){
 
-    const RED = 1;
-    const BLUE = 2;
-
     let ballPosition = room.getBallPosition();
 
     if ((ballPosition.x != 0 || ballPosition.y != 0) && !isGameStarted) {
@@ -672,9 +673,6 @@ function delay(time) {
 
 function getTeamResult(scores){
 
-    const RED = 1;
-    const BLUE = 2;
-
     let winner = -1;
     let loser = -1;
 
@@ -694,9 +692,6 @@ function getTeamResult(scores){
 }
 
 function fillEmptiestTeam(playerID){
-
-    const RED = 1;
-    const BLUE = 2;
 
     if(playersTeam[RED].size <= playersTeam[BLUE].size){
 
@@ -718,7 +713,6 @@ function moveSpecToTeam(team){
         return;
     }
 
-    const SPEC = 0;
     const MAX_PLAYERS = 1;
     let i = 0;
 
@@ -765,7 +759,6 @@ function moveLosersToSpec(loosingTeam) {
         return;
     }
 
-    const SPEC = 0;
     const players = [...playersTeam[loosingTeam]];
     
     for(const playerID of players){
@@ -861,7 +854,6 @@ async function manageGoalStatsAndDisplay(team){
 
     const scoredForOwnTeam = scorer.team === team;
 
-    const RED = 1;
     let color = team === RED ? textColor.RED : textColor.BLUE;
 
     if(scoredForOwnTeam){
@@ -957,10 +949,6 @@ function getGK(team, replacement) {
 
 function getTeamEmoji(team){
 
-    const SPEC = 0;
-    const RED = 1;
-    const BLUE = 2;
-
     switch(team){
 
         case SPEC:
@@ -1017,8 +1005,6 @@ async function saveGameStats(winningTeam){
     
     const PLAYERS_AMOUNT = 4;
     const TEAMS_AMOUNT = 2;
-    const RED = 1;
-    const BLUE = 2;
 
     const scores = room.getScores();
 
@@ -1313,8 +1299,6 @@ function getAuth(playerId) {
 
 function areEnoughPlayers(){
 
-    const RED = 1;
-    const BLUE = 2;
     const PLAYER_AMOUNT = 4;
 
     if(playersTeam[RED].size != PLAYER_AMOUNT || playersTeam[BLUE].size != PLAYER_AMOUNT){
@@ -1327,7 +1311,6 @@ function areEnoughPlayers(){
 
 async function managePlayerLeft(player){
 
-    const SPEC = 0;
     const ID = player.id;
     const team = player.team;
     const auth = getAuth(ID);
@@ -1518,6 +1501,9 @@ const API = {
             return;
         }
 
+        const scores = room.getScores();
+        const extra = scores.time >= scores.timeLimit;
+
         const response = await fetch(
             `http://localhost:${APIPort}/jugador/agregar-estadistica`,
             {
@@ -1527,7 +1513,8 @@ const API = {
                 },
                 body: JSON.stringify({
                     stat,
-                    auth
+                    auth,
+                    extra
                 })
             }
             

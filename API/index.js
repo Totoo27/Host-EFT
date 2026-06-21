@@ -209,9 +209,9 @@ app.put("/jugador/agregar-estadistica", async (req, res) => {
 
     try {
 
-        const { stat, auth } = req.body;
+        const { stat, auth, extra } = req.body;
 
-        await statsService.agregarEstadisticaJugador(stat, auth, TEMPORADA_ACTIVA);
+        await statsService.agregarEstadisticaJugador(stat, auth, TEMPORADA_ACTIVA, extra);
 
         return res.status(200).json(`${stat} actualizado exitosamente en jugador!`);
 
@@ -227,12 +227,11 @@ app.put("/club/agregar-estadistica/:estadistica/:id", async (req, res) => {
 
     try {
 
-        const estadistica = req.params.estadistica;
-        const clubId = req.params.id;
+        const { stat, clubId, extra } = req.body;
 
-        await statsService.agregarEstadisticaClub(estadistica, clubId, TEMPORADA_ACTIVA);
+        await statsService.agregarEstadisticaClub(stat, clubId, TEMPORADA_ACTIVA, extra);
 
-        return res.status(200).json(`${estadistica} actualizado exitosamente en club!`);
+        return res.status(200).json(`${stat} actualizado exitosamente en club!`);
 
     } catch (err){
 
