@@ -260,6 +260,24 @@ app.put("/club/agregar/:authJugador/:idClub", async (req, res) => {
 
 });
 
+app.put("/jugador/cambiar-nombre", async (req, res) => {
+
+    try{
+
+        const { auth, name } = req.body;
+
+        await jugadorService.cambiarNombre(auth, name);
+
+        return res.status(200).json(`Nombre actualizado exitosamente del jugador!`);
+
+    } catch(err){
+
+        return res.status(500).json(err);
+
+    }
+
+});
+
 app.put("/club/eliminar-jugador/:auth", async (req, res) => {
 
     try{

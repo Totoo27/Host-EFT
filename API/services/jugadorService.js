@@ -104,6 +104,21 @@ async function buscarRol(auth, rolId){
 
 }
 
+async function cambiarNombre(auth, nombre){
+
+    existeJugador(auth);
+
+    await database.query(
+        `
+        UPDATE Jugadores
+        SET nombre = ?
+        WHERE auth = ?
+        `,
+        [nombre, auth]
+    );
+
+}
+
 async function eliminarJugadorRol(auth, id_rol){
 
     const [consulta] = await database.query(
@@ -164,6 +179,8 @@ module.exports = {
 
     buscarJugador,
     buscarVIP,
+
+    cambiarNombre,
 
     buscarRol,
     eliminarJugadorRol

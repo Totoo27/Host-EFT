@@ -398,15 +398,22 @@ room.onPlayerJoin = async function(player){
 
     const auth = player.auth;
     const playerID = player.id;
+    const playerName = player.name;
 
     // Roles
     const ADMIN = 1;
     const BANNED = 5;
 
     if(!(await playerExists(auth))){
-        await API.createPlayer(player.name, auth);
+        await API.createPlayer(playerName, auth);
     }
+
     const stats = await API.searchPlayer(auth);
+    
+    if(stats.nombre !== playerName){
+        room.sendAnnouncement(stats.nombre + " se ha cambiado el nombre a " + playerName + "!", null, textColor.SUCCESS, textFont.BOLD, textSound.MUTE);
+        await API.changeName(auth, playerName);
+    }
 
     if(await isRole(auth, ADMIN)){
         adminsList.add(playerID);
@@ -414,7 +421,7 @@ room.onPlayerJoin = async function(player){
     }
 
     if(await isRole(auth, BANNED)){
-        room.kickPlayer(playerID, "[❌] Estás blacklisteado papi", true);
+        room.kickPlayer(playerID, "[❌] Estás blacklisteado flaquito", true);
     }
 
     if(!areEnoughPlayers()){
@@ -573,8 +580,8 @@ room.onPlayerTeamChange = function (changedPlayer, byPlayer){
 };
 
 room.onPlayerBallKick = function (player) {
-    playerKickBall[1] = playerKickBall[0]
-    playerKickBall[0] = player
+    playerKickBall[1] = playerKickBall[0];
+    playerKickBall[0] = player;
 };
 
 room.onGameStart = async function (byPlayer){
@@ -1534,6 +1541,25 @@ const API = {
         const data = await response.text();
         console.log(data);
         */
+
+    },
+
+    async changeName(auth, name){
+
+        const response = await fetch(
+            `http://localhost:${APIPort}/jugador/cambiar-nombre`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    auth,
+                    name
+                })
+            }
+            
+        )
 
     }
 
