@@ -11,10 +11,10 @@ const GANANCIA_XP = {
     vallas_invictas: 4,
     mvps: 3,
 
-    partidos_perdidos: -3,
     partidos_abandonados: -5,
-    partidos_ganados: 3,
-
+    
+    partidos_perdidos: 0,
+    partidos_ganados: 0,
     partidos_arquero: 0,
     partidos_jugados: 0
 
@@ -51,7 +51,24 @@ const estadisticasValidas = [
 
 ];
 
-async function agregarEstadisticaJugador(estadistica, auth, temporada, extra){
+async function actualizarXP(auth, xp, temporada, clubId){
+
+    await existeJugador(auth);
+
+    await database.query(
+
+            `
+            UPDATE estadisticas
+                SET xp = xp + ?
+                WHERE jugador_auth = ? AND id_temporada = ?
+            `,
+            [xp, auth, temporada]
+
+    );
+
+}
+
+async function agregarEstadistica(estadistica, auth, temporada, extra, clubId){
 
     existeEstadistica(estadistica);
     await existeJugador(auth);
@@ -70,15 +87,9 @@ async function agregarEstadisticaJugador(estadistica, auth, temporada, extra){
 
     );
 
-}
-
-async function agregarEstadisticaClub(estadistica, id, temporada, extra){
-
-    existeEstadistica(estadistica);
-    await existeClub(id);
-
-    const gananciaXP = obtenerXP(estadistica, extra);
-    const gananciaMonedas = GANANCIA_MONEDAS[estadistica] ?? 0;
+    if(clubId == null){
+        return;
+    }
 
     await database.query(
 
@@ -87,7 +98,7 @@ async function agregarEstadisticaClub(estadistica, id, temporada, extra){
                 SET ${estadistica} = ${estadistica} + 1, xp = xp + ${gananciaXP}, monedas = monedas + ${gananciaMonedas}
                 WHERE id_club = ? AND id_temporada = ?
             `,
-            [id, temporada]
+            [clubId, temporada]
 
     );
 
@@ -112,6 +123,6 @@ function obtenerXP(estadistica, extra){
 }
 
 module.exports = {
-    agregarEstadisticaJugador,
-    agregarEstadisticaClub
+    agregarEstadistica,
+    actualizarXP
 }

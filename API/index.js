@@ -205,13 +205,15 @@ app.get("/jugador-rol/buscar/:auth/:rolId", async (req, res) => {
 
 });
 
+
+
 app.put("/jugador/agregar-estadistica", async (req, res) => {
 
     try {
 
-        const { stat, auth, extra } = req.body;
+        const { stat, auth, extra, clubId } = req.body;
 
-        await statsService.agregarEstadisticaJugador(stat, auth, TEMPORADA_ACTIVA, extra);
+        await statsService.agregarEstadistica(stat, auth, TEMPORADA_ACTIVA, extra, clubId);
 
         return res.status(200).json(`${stat} actualizado exitosamente en jugador!`);
 
@@ -223,15 +225,15 @@ app.put("/jugador/agregar-estadistica", async (req, res) => {
 
 });
 
-app.put("/club/agregar-estadistica/:estadistica/:id", async (req, res) => {
+app.put("/jugador/actualizar-xp", async (req, res) => {
 
     try {
 
-        const { stat, clubId, extra } = req.body;
+        const { xp, auth, clubId } = req.body;
 
-        await statsService.agregarEstadisticaClub(stat, clubId, TEMPORADA_ACTIVA, extra);
+        await statsService.actualizarXP(auth, xp, TEMPORADA_ACTIVA, clubId);
 
-        return res.status(200).json(`${stat} actualizado exitosamente en club!`);
+        return res.status(200).json(`XP actualizada correctamente!`);
 
     } catch (err){
 

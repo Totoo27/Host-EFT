@@ -327,11 +327,13 @@ const MVPpoints = {
 
 let isGameStarted = false;
 
-// Team constants
+// Teams management
 
 const SPEC = 0;
 const RED = 1;
 const BLUE = 2;
+
+let ProfitXP = [-1,-1];
 
 // Ranks management
 
@@ -435,7 +437,8 @@ room.onPlayerJoin = async function(player){
         auth: auth.toString(),
         conn: player.conn.toString(),
         rank: (await getRank(stats)).toString(),
-        rankMessage: (await getRankMessage(stats)).toString()
+        rankMessage: (await getRankMessage(stats)).toString(),
+        club: stats.id_club
     });
 
 };
@@ -587,6 +590,7 @@ room.onPlayerBallKick = function (player) {
 room.onGameStart = async function (byPlayer){
 
     await initJerseys();
+    await calculateXPGains();
 
 };
 
@@ -672,6 +676,44 @@ async function autoStop(){
     await delay(cooldown);
     room.startGame();
 
+}
+
+async function calculateXPGains(){
+
+    const defaultGains = 8;
+
+    const TEAMS_AMOUNT = 2;
+    const PLAYERS_AMOUNT = 4;
+
+    let averageXP = [
+        0,
+        0
+    ]
+
+    for(let team = 1; team < TEAMS_AMOUNT + 1; team++){
+
+        for (const playerID of playersTeam[team]) {
+
+            averageXP[team - 1] += (await searchPlayer(getAuth(playerID))).xp;
+
+        }
+
+        averageXP[team - 1] /= playersTeam[team].size;
+
+    }
+
+    const winRate = [
+        getExpectedWinRate(averageXP[0], averageXP[1]),
+        getExpectedWinRate(averageXP[1], averageXP[0]),
+    ];
+
+    ProfitXP[RED - 1] = Math.ceil(defaultGains * (1 - winRate[RED - 1]));
+    ProfitXP[BLUE - 1] = Math.ceil(defaultGains * (1 - winRate[BLUE - 1]));
+
+}
+
+function getExpectedWinRate(ratingA, ratingB){
+    return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
 }
 
 function delay(time) {
@@ -992,6 +1034,11 @@ function restartGameStats(){
         -1
     ];
 
+    ProfitXP = [
+        -1,
+        -1
+    ];
+
     isGameStarted = false;
 
     MVPstats = {};
@@ -1012,8 +1059,10 @@ async function saveGameStats(winningTeam){
     
     const PLAYERS_AMOUNT = 4;
     const TEAMS_AMOUNT = 2;
+    const xpGains = ProfitXP[winningTeam - 1];
 
     const scores = room.getScores();
+
 
     for(let team = 1; team < TEAMS_AMOUNT + 1; team++){
 
@@ -1036,9 +1085,15 @@ async function saveGameStats(winningTeam){
             }            
 
             if(team === winningTeam){
+
                 await API.updatePlayerStats(playerAuth, "partidos_ganados");
+                await API.updateXP(playerAuth, xpGains);
+
             } else {
+
                 await API.updatePlayerStats(playerAuth, "partidos_perdidos");
+                await API.updateXP(playerAuth, -xpGains);
+
             }
             
         }
@@ -1511,6 +1566,9 @@ const API = {
         const scores = room.getScores();
         const extra = scores.time >= scores.timeLimit;
 
+        const player = playersInfo.get(auth);
+        const clubId = player.club;
+
         const response = await fetch(
             `http://localhost:${APIPort}/jugador/agregar-estadistica`,
             {
@@ -1521,26 +1579,52 @@ const API = {
                 body: JSON.stringify({
                     stat,
                     auth,
-                    extra
+                    extra,
+                    clubId
                 })
             }
             
         )
 
         // update cache of player rank
-
-        const player = playersInfo.get(auth);
+        
         const stats = await API.searchPlayer(auth);
         player.rank = (await getRank(stats)).toString(),
         player.rankMessage = (await getRankMessage(player)).toString();
-
-        // If players club is not null, then save stats into his club
 
         /*
         console.log(response.status);
         const data = await response.text();
         console.log(data);
         */
+
+    },
+
+    async updateXP(auth, xp){
+
+        if(!areEnoughPlayers()){
+            console.log("No hay jugadores suficientes para guardar estadísticas");
+            return;
+        }
+
+        const player = playersInfo.get(auth);
+        const clubId = player.club;
+
+        const response = await fetch(
+            `http://localhost:${APIPort}/jugador/cambiar-nombre`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    xp,
+                    auth,
+                    clubId
+                })
+            }
+            
+        )
 
     },
 
