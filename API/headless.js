@@ -501,6 +501,10 @@ room.onPlayerChat = function (player, message, playerName) {
                 showRank(playerID);
             break;
 
+            case "discord":
+                showDiscordMessage(playerID);
+            break;
+
             // Admins Only
 
             case "rr":
@@ -680,6 +684,11 @@ async function autoStop(){
 
 async function calculateXPGains(){
 
+    if(!areEnoughPlayers()){
+        console.log("No hay jugadores suficientes para guardar estadísticas de partido");
+        return;
+    }
+
     const defaultGains = 8;
 
     const TEAMS_AMOUNT = 2;
@@ -694,11 +703,13 @@ async function calculateXPGains(){
 
         for (const playerID of playersTeam[team]) {
 
-            averageXP[team - 1] += (await searchPlayer(getAuth(playerID))).xp;
+            averageXP[team - 1] += (await API.searchPlayer(getAuth(playerID))).xp;
 
         }
 
-        averageXP[team - 1] /= playersTeam[team].size;
+        if(playersTeam[team].size != 0){
+            averageXP[team - 1] /= playersTeam[team].size;
+        }
 
     }
 
@@ -709,6 +720,24 @@ async function calculateXPGains(){
 
     ProfitXP[RED - 1] = Math.ceil(defaultGains * (1 - winRate[RED - 1]));
     ProfitXP[BLUE - 1] = Math.ceil(defaultGains * (1 - winRate[BLUE - 1]));
+
+    for(const playerID of playersTeam[RED]){
+        room.sendAnnouncement("[🔴] XP: Si ganas +" + ProfitXP[RED - 1] + ". Si perdes -" + ProfitXP[BLUE - 1], playerID, textColor.STATS, textFont.BOLD, textSound.IMPORTANT);
+    }
+
+    for(const playerID of playersTeam[BLUE]){
+        room.sendAnnouncement("[🔵] XP: Si ganas +" + ProfitXP[BLUE - 1] + ". Si perdes -" + ProfitXP[RED - 1], playersTeam[BLUE], textColor.STATS, textFont.BOLD, textSound.IMPORTANT);
+    }
+        
+
+}
+
+function showDiscordMessage(playerID){
+
+    room.sendAnnouncement("             ▒█▀▀▄ ▀█▀ ▒█▀▀▀█ ▒█▀▀█ ▒█▀▀▀█ ▒█▀▀█ ▒█▀▀▄ ", playerID, 0x9250FD, textFont.BOLD, textSound.MUTE)
+    room.sendAnnouncement("             ▒█░▒█ ▒█░ ░▀▀▀▄▄ ▒█░░░ ▒█░░▒█ ▒█▄▄▀ ▒█░▒█ ", playerID, 0x8466FD, textFont.BOLD, textSound.MUTE)
+    room.sendAnnouncement("             ▒█▄▄▀ ▄█▄ ▒█▄▄▄█ ▒█▄▄█ ▒█▄▄▄█ ▒█░▒█ ▒█▄▄▀ ", playerID, 0x7B73FD, textFont.BOLD, textSound.MUTE);
+    room.sendAnnouncement("             💬 Discord Link: ➡ https://discord.gg/ ⬅", playerID, 0xF6FF43, textFont.BOLD, textSound.NORMAL);
 
 }
 
