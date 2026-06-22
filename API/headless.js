@@ -483,9 +483,10 @@ room.onPlayerChat = function (player, message, playerName) {
 
     const permissionMessage = "No tenés los permisos para realizar este comando.";
     const playerID = player.id;
+    const words = message.split(" ");
 
+    // Commands
     if (message.charAt(0) == '!') {
-        words = message.split(" ")
         switch (words[0].substring(1)) {
 
             case "nv":
@@ -564,6 +565,16 @@ room.onPlayerChat = function (player, message, playerName) {
     }
 
     // Message management
+
+    if (words[0] == "t") {
+        sendTeamMessage(message, player);
+        return false;
+    }
+
+    if(message.charAt(0) == "@" && message.charAt(1) == "@"){
+        sendMSG(message, player);
+        return false;
+    }
 
     let color = textColor.NORMAL;
     let font = textFont.NORMAL;
@@ -733,12 +744,7 @@ async function calculateXPGains(){
 }
 
 function showDiscordMessage(playerID){
-
-    room.sendAnnouncement("             ▒█▀▀▄ ▀█▀ ▒█▀▀▀█ ▒█▀▀█ ▒█▀▀▀█ ▒█▀▀█ ▒█▀▀▄ ", playerID, 0x9250FD, textFont.BOLD, textSound.MUTE)
-    room.sendAnnouncement("             ▒█░▒█ ▒█░ ░▀▀▀▄▄ ▒█░░░ ▒█░░▒█ ▒█▄▄▀ ▒█░▒█ ", playerID, 0x8466FD, textFont.BOLD, textSound.MUTE)
-    room.sendAnnouncement("             ▒█▄▄▀ ▄█▄ ▒█▄▄▄█ ▒█▄▄█ ▒█▄▄▄█ ▒█░▒█ ▒█▄▄▀ ", playerID, 0x7B73FD, textFont.BOLD, textSound.MUTE);
-    room.sendAnnouncement("             💬 Discord Link: ➡ https://discord.gg/ ⬅", playerID, 0xF6FF43, textFont.BOLD, textSound.NORMAL);
-
+    room.sendAnnouncement("💬 Discord Link: ➡ https://discord.gg/ ⬅", playerID, 0xF6FF43, textFont.BOLD, textSound.NORMAL);
 }
 
 function getExpectedWinRate(ratingA, ratingB){
@@ -871,6 +877,48 @@ function addPointsMVP(playerID, points){
     }
 
     MVPstats[playerID] += points;
+
+}
+
+function sendMSG(message, player){
+
+    const words = message.split(" ");
+    const playerID = getPlayerIDbyName(words[0].substring(2));
+    const playerName = player.name;
+
+    if (playerID != -1) {
+        room.sendAnnouncement("[💬] " + playerName + ": " + words.slice(1).join(' ') + " [🔒]", player.id, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
+        room.sendAnnouncement("[💬] " + playerName + ": " + words.slice(1).join(' ') + " [🔒]", playerID, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
+    } else {
+        room.sendAnnouncement("Jugador no encontrado. Verifique haberlo escrito de la siguiente forma: @@nombre-del-jugador", player.id, textColor.ERROR, textFont.BOLD);
+    }
+
+}
+
+function sendTeamMessage(message, player) {
+
+    const words = message.split(" ");
+    const team = player.team
+
+    if(team === 0){
+        room.sendAnnouncement("No estás en ningún equipo.", player.id, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+        return;
+    }
+
+    if (words.length == 1) {
+        room.sendAnnouncement("t mensaje", player.id, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);  
+        return;
+    }
+    
+    for (const playerID of playersTeam[team]) {
+
+        if (team === RED) {
+            room.sendAnnouncement("[🔴] " + player.name + ": " + words.slice(1).join(' '), playerID, textColor.RED, textFont.BOLD);
+        } else {
+            room.sendAnnouncement("[🔵] " + player.name + ": " + words.slice(1).join(' '), playerID, textColor.BLUE, textFont.BOLD);
+        }
+
+    }
 
 }
 
