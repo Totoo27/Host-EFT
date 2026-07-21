@@ -340,7 +340,7 @@ let ProfitXP = [
 
 // Picks management
 
-const MIN_PLAYERS_FOR_PICKS = 12;
+const MIN_PLAYERS_FOR_PICKS = 2;
 let picking = false;
 let enabledPicks = false;
 let pickingPlayer = null;
@@ -445,11 +445,14 @@ room.onPlayerJoin = async function(player){
         club: stats.id_club
     });
 
-    updatePickMode();
+    updateTeamsChange(SPEC, playerID);
 
-    if(enabledPicks || areEnoughPlayersInGame()){
-        updateTeamsChange(SPEC, playerID);
-    } else {
+    updatePickMode();
+    if(picking){
+        sendPickPrompt();
+    }
+
+    if(!enabledPicks && !areEnoughPlayersInGame()){
         fillEmptiestTeam(playerID);
     }
 
@@ -710,7 +713,7 @@ async function autoStop(){
     const cooldown = 5000;
 
     room.stopGame();
-    room.sendAnnouncement("Comenzando proximo partido pronto...");
+    room.sendAnnouncement("Empezando partido en " + (cooldown/1000) + " segundos...", null, textColor.GAME, textFont.NORMAL, textSound.NORMAL);
     await delay(cooldown);
     room.startGame();
 
@@ -1571,7 +1574,6 @@ function startPickMode(){
         if(picking){
             room.pauseGame(false);
         }
-
         picking = false;
         pickingPlayer = null;
         return;
@@ -1613,10 +1615,12 @@ function sendPickPrompt(){
 
     let i = 0;
     for(const playerID of playersTeam[SPEC]){
+
         const playerObj = getPlayerByID(playerID);
         const displayName = playerObj ? playerObj.name : ("ID " + playerID);
         room.sendAnnouncement((i + 1) + " - " + displayName, pickingPlayer, textColor.ERROR, textFont.SMALL_BOLD, textSound.MUTE);
         i++;
+        
     }
 
 }
