@@ -310,7 +310,7 @@ let isGKgot = false;
 let gkRed = -1;
 let gkBlue = -1;
 
-// MVP Management
+// MVP management
 
 let MVPstats = {};
 
@@ -323,7 +323,7 @@ const MVPpoints = {
 
 }
 
-// Game Management
+// Game management
 
 let isGameStarted = false;
 
@@ -333,7 +333,19 @@ const SPEC = 0;
 const RED = 1;
 const BLUE = 2;
 
-let ProfitXP = [-1,-1];
+let ProfitXP = [
+    -1,
+    -1
+];
+
+// Picks management
+
+const MIN_PLAYERS_FOR_PICKS = 2;
+const DEFAULT_TIME_PICK = 15;
+let picking = false;
+let pickingPlayer = null;
+let enabledPicks = false;
+let timePicking = DEFAULT_TIME_PICK;
 
 // Ranks management
 
@@ -388,6 +400,32 @@ const RANKS = [
     }
 ];
 
+// Running (Time by 1s)
+setInterval(() => {
+    
+    const time = 1;
+
+    // Timers
+    if(picking){
+
+        timePicking -= time;
+
+        if(pickingPlayer == null){
+            return;
+        }
+
+        if(timePicking == Math.floor(DEFAULT_TIME_PICK/2)){
+            room.sendAnnouncement("[⚠] Si no elegís a un jugador vas a ser kickeado por afk", pickingPlayer, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+        }
+
+        if(timePicking <= 0){
+            room.kickPlayer(pickingPlayer, "[💤] AFK pickeando", false);
+        }
+    }
+
+
+}, 1000);
+
 // EVENTS
 
 room.onRoomLink = async function(){
@@ -417,20 +455,14 @@ room.onPlayerJoin = async function(player){
         await API.changeName(auth, playerName);
     }
 
-    if(await isRole(auth, ADMIN)){
-        adminsList.add(playerID);
-        room.setPlayerAdmin(playerID, true);
-    }
-
+    // Get roles
     if(await isRole(auth, BANNED)){
         room.kickPlayer(playerID, "[❌] Estás blacklisteado flaquito", true);
     }
 
-    if(!areEnoughPlayers()){
-        fillEmptiestTeam(playerID);
-    } else {
-        // Stays on spectator
-        updateTeamsChange(SPEC, playerID);
+    if(await isRole(auth, ADMIN)){
+        adminsList.add(playerID);
+        room.setPlayerAdmin(playerID, true);
     }
 
     playersInfo.set(playerID, {
@@ -440,6 +472,17 @@ room.onPlayerJoin = async function(player){
         rankMessage: (await getRankMessage(stats)).toString(),
         club: stats.id_club
     });
+
+    updateTeamsChange(SPEC, playerID);
+
+    updatePickMode();
+    if(picking){
+        sendPickPrompt();
+    }
+
+    if(!enabledPicks && !areEnoughPlayersInGame()){
+        fillEmptiestTeam(playerID);
+    }
 
 };
 
@@ -475,7 +518,12 @@ room.onTeamVictory = async function(scores){
     if(winningTeam === BLUE){
         movePlayersToStreak(BLUE, RED);
     }
-    moveSpecToTeam(BLUE);
+
+    updatePickMode();
+
+    if(!enabledPicks){
+        moveSpecToTeam(BLUE);
+    }
 
 };
 
@@ -566,6 +614,11 @@ room.onPlayerChat = function (player, message, playerName) {
 
     // Message management
 
+    if(picking && isNumeric(message) && playerID === pickingPlayer){
+        pick(message, player);
+        return false;
+    }
+
     if (words[0] == "t") {
         sendTeamMessage(message, player);
         return false;
@@ -606,6 +659,7 @@ room.onGameStart = async function (byPlayer){
 
     await initJerseys();
     await calculateXPGains();
+    updatePickMode();
 
 };
 
@@ -687,7 +741,7 @@ async function autoStop(){
     const cooldown = 5000;
 
     room.stopGame();
-    room.sendAnnouncement("Comenzando proximo partido pronto...");
+    room.sendAnnouncement("Empezando partido en " + (cooldown/1000) + " segundos...", null, textColor.GAME, textFont.NORMAL, textSound.NORMAL);
     await delay(cooldown);
     room.startGame();
 
@@ -695,8 +749,7 @@ async function autoStop(){
 
 async function calculateXPGains(){
 
-    if(!areEnoughPlayers()){
-        console.log("No hay jugadores suficientes para guardar estadísticas de partido");
+    if(!areEnoughPlayersInGame()){
         return;
     }
 
@@ -1035,7 +1088,7 @@ function getGK(team, replacement) {
     if (team >= 3 || team <= 0) return -1;
     if (playersTeam[team].size <= 0) return -1;
 
-    let firstPlayer = playersTeam[team].values().next().value
+    let firstPlayer = getFirstFromTeam(team);
     if (playersTeam[team].size == 1) return firstPlayer;
 
     // Define arch position
@@ -1124,7 +1177,7 @@ function restartGameStats(){
 
 async function saveGameStats(winningTeam){
 
-    if(!areEnoughPlayers()){
+    if(!areEnoughPlayersInGame()){
         console.log("No hay jugadores suficientes para guardar estadísticas de partido");
         return;
     }
@@ -1436,7 +1489,7 @@ function getAuth(playerId) {
     return playerInfo.auth;
 }
 
-function areEnoughPlayers(){
+function areEnoughPlayersInGame(){
 
     const PLAYER_AMOUNT = 4;
 
@@ -1445,6 +1498,46 @@ function areEnoughPlayers(){
     }
 
     return true;
+
+}
+
+function updatePickMode(){
+
+    const totalPlayers = room.getPlayerList().length;
+
+    if(totalPlayers < MIN_PLAYERS_FOR_PICKS){
+
+        if(enabledPicks || picking){
+
+            if(picking){
+                room.sendAnnouncement("[⚠️] No hay suficientes jugadores, se desactivó el modo picks.", null, textColor.ERROR, textFont.BOLD, textSound.NORMAL);
+                room.pauseGame(false);
+            }
+
+            enabledPicks = false;
+            picking = false;
+            pickingPlayer = null;
+
+            autoFillTeams();
+
+        }
+
+        return;
+    }
+
+    enabledPicks = true;
+
+    if(!picking){
+        startPickMode();
+    }
+
+}
+
+function autoFillTeams(){
+
+    while(!areEnoughPlayersInGame() && playersTeam[SPEC].size > 0){
+        fillEmptiestTeam(getFirstFromTeam(SPEC));
+    }
 
 }
 
@@ -1470,8 +1563,133 @@ async function managePlayerLeft(player){
         gkRed = getGK(1, true);
     }
 
-    delete playersInfo[ID];
+    playersInfo.delete(ID);
 
+    const wasPicker = picking && ID === pickingPlayer;
+    const wasSpecWaiting = picking && team === SPEC;
+
+    updatePickMode();
+
+    if(picking && wasPicker){
+
+        startPickMode();
+
+    } else if(picking && wasSpecWaiting){
+
+        sendPickPrompt();
+
+    } else if(!enabledPicks && !areEnoughPlayersInGame() && playersTeam[SPEC].size > 0){
+
+        fillEmptiestTeam(getFirstFromTeam(SPEC));
+
+    }
+
+    const players = room.getPlayerList();
+
+    if(players.length < 1){
+        enabledPicks = false;
+        picking = false;
+        pickingPlayer = null;
+    }
+
+}
+
+function startPickMode(){
+
+    if(areEnoughPlayersInGame() || playersTeam[SPEC].size === 0){
+
+        if(picking){
+            room.pauseGame(false);
+        }
+        picking = false;
+        pickingPlayer = null;
+        return;
+
+    }
+
+    const pickingTeam = playersTeam[RED].size <= playersTeam[BLUE].size ? RED : BLUE;
+    const nextPicker = getFirstFromTeam(pickingTeam);
+
+    if(nextPicker == null){
+        if(picking){
+            room.pauseGame(false);
+        }
+        picking = false;
+        pickingPlayer = null;
+        return;
+    }
+
+    const wasAlreadyPicking = picking;
+
+    picking = true;
+    pickingPlayer = nextPicker;
+    timePicking = DEFAULT_TIME_PICK;
+
+    if(!wasAlreadyPicking){
+        room.pauseGame(true);
+    }
+
+    sendPickPrompt();
+
+}
+
+function sendPickPrompt(){
+
+    const pickerObj = getPlayerByID(pickingPlayer);
+    const pickingTeam = pickerObj ? pickerObj.team : null;
+    const teamEmoji = getTeamEmoji(pickingTeam);
+
+    room.sendAnnouncement(`[${teamEmoji}] Elegí un jugador según el número:`, pickingPlayer, textColor.ERROR, textFont.SMALL_BOLD, textSound.IMPORTANT);
+
+    let i = 0;
+    for(const playerID of playersTeam[SPEC]){
+
+        const playerObj = getPlayerByID(playerID);
+        const displayName = playerObj ? playerObj.name : ("ID " + playerID);
+        room.sendAnnouncement((i + 1) + " - " + displayName, pickingPlayer, textColor.ERROR, textFont.SMALL_BOLD, textSound.MUTE);
+        i++;
+        
+    }
+
+}
+
+function pick(message, player) {
+
+    if (!picking || player.id !== pickingPlayer) return;
+
+    const index = parseInt(message, 10) - 1;
+    const specArray = [...playersTeam[SPEC]];
+    const pickedPlayer = specArray[index];
+
+    if(pickedPlayer == null){
+        room.sendAnnouncement("El número ingresado no corresponde a ningún jugador!", pickingPlayer, textColor.ERROR, textFont.SMALL_BOLD, textSound.MUTE);
+        return;
+    }
+
+    const teamThatPicks = player.team;
+
+    room.setPlayerTeam(pickedPlayer, teamThatPicks);
+    updateTeamsChange(teamThatPicks, pickedPlayer);
+
+    if(areEnoughPlayersInGame()){
+        room.sendAnnouncement("[🚨] Los equipos ya están completos, el partido puede comenzar.", null, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT);
+    }
+
+    startPickMode();
+
+}
+
+function getPlayerByID(id){
+    let players = room.getPlayerList(); // Obtener lista de jugadores
+    return players.find(player => player.id === id) || null; // Buscar jugador por auth
+}
+
+function getFirstFromTeam(team){
+    return playersTeam[team].values().next().value;
+}
+
+function isNumeric(value){
+    return /^-?\d+$/.test(value);
 }
 
 async function playerExists(auth){
@@ -1635,8 +1853,7 @@ const API = {
 
     async updatePlayerStats(auth, stat){
 
-        if(!areEnoughPlayers()){
-            console.log("No hay jugadores suficientes para guardar estadísticas");
+        if(!areEnoughPlayersInGame()){
             return;
         }
 
@@ -1679,8 +1896,7 @@ const API = {
 
     async updateXP(auth, xp){
 
-        if(!areEnoughPlayers()){
-            console.log("No hay jugadores suficientes para guardar estadísticas");
+        if(!areEnoughPlayersInGame()){
             return;
         }
 
