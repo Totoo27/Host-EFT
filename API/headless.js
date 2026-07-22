@@ -341,9 +341,11 @@ let ProfitXP = [
 // Picks management
 
 const MIN_PLAYERS_FOR_PICKS = 2;
+const DEFAULT_TIME_PICK = 15;
 let picking = false;
-let enabledPicks = false;
 let pickingPlayer = null;
+let enabledPicks = false;
+let timePicking = DEFAULT_TIME_PICK;
 
 // Ranks management
 
@@ -397,6 +399,32 @@ const RANKS = [
         max: Infinity
     }
 ];
+
+// Running (Time by 1s)
+setInterval(() => {
+    
+    const time = 1;
+
+    // Timers
+    if(picking){
+
+        timePicking -= time;
+
+        if(pickingPlayer == null){
+            return;
+        }
+
+        if(timePicking == Math.floor(DEFAULT_TIME_PICK/2)){
+            room.sendAnnouncement("[⚠] Si no elegís a un jugador vas a ser kickeado por afk", pickingPlayer, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+        }
+
+        if(timePicking <= 0){
+            room.kickPlayer(pickingPlayer, "[💤] AFK pickeando", false);
+        }
+    }
+
+
+}, 1000);
 
 // EVENTS
 
@@ -722,7 +750,6 @@ async function autoStop(){
 async function calculateXPGains(){
 
     if(!areEnoughPlayersInGame()){
-        // console.log("No hay jugadores suficientes para guardar estadísticas de partido");
         return;
     }
 
@@ -1596,6 +1623,7 @@ function startPickMode(){
 
     picking = true;
     pickingPlayer = nextPicker;
+    timePicking = DEFAULT_TIME_PICK;
 
     if(!wasAlreadyPicking){
         room.pauseGame(true);
