@@ -294,6 +294,7 @@ let playersTeam = [
     ];
 
 let adminsList = new Set();
+let VIPList = new Set();
 
 let playersInfo = new Map();
 
@@ -340,12 +341,17 @@ let ProfitXP = [
 
 // Picks management
 
-const MIN_PLAYERS_FOR_PICKS = 2;
+const MIN_PLAYERS_FOR_PICKS = 12;
 const DEFAULT_TIME_PICK = 15;
 let picking = false;
 let pickingPlayer = null;
 let enabledPicks = false;
 let timePicking = DEFAULT_TIME_PICK;
+
+// AFK Management
+
+let InGameAFKData = new Map(); // { playerID: { lastX, lastY, lastMoveTick, warned } }
+const AFK_TIME_KICK = 15;
 
 // Ranks management
 
@@ -405,7 +411,7 @@ setInterval(() => {
     
     const time = 1;
 
-    // Timers
+    // picker AFK management
     if(picking){
 
         timePicking -= time;
@@ -422,7 +428,6 @@ setInterval(() => {
             room.kickPlayer(pickingPlayer, "[💤] AFK pickeando", false);
         }
     }
-
 
 }, 1000);
 
@@ -473,6 +478,13 @@ room.onPlayerJoin = async function(player){
         club: stats.id_club
     });
 
+    InGameAFKData.set(playerID, {
+        lastX: null,
+        lastY: null,
+        lastMoveTick: 0,
+        warned: false
+    });
+
     updateTeamsChange(SPEC, playerID);
 
     updatePickMode();
@@ -481,6 +493,7 @@ room.onPlayerJoin = async function(player){
     }
 
     if(!enabledPicks && !areEnoughPlayersInGame()){
+
         fillEmptiestTeam(playerID);
     }
 
@@ -553,6 +566,32 @@ room.onPlayerChat = function (player, message, playerName) {
             case "discord":
                 showDiscordMessage(playerID);
             break;
+
+            // VIP
+
+            case "afk":
+
+                if(!VIPList.has(playerID) && !adminsList.has(playerID)){
+                    room.sendAnnouncement(permissionMessage, playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
+                }
+
+                if(!playersTeam[SPEC].has(playerID)){
+                    room.sendAnnouncement("No podes usar este comando mientras jugas.", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
+                }
+
+                if(playersAFK.has(playerID)){
+                    room.sendAnnouncement("Ya no estás afk", playerID, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT);
+                    playersAFK.delete(playerID);
+                    break;
+                }
+
+                room.sendAnnouncement("Estás afk", playerID, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT);
+                playersAFK.add(playerID);
+
+            break;
+            
 
             // Admins Only
 
@@ -666,6 +705,7 @@ room.onGameStart = async function (byPlayer){
 room.onGameStop = function () {
 
     restartGameStats();
+    autoFillTeams();
 
 };
 
@@ -683,6 +723,51 @@ room.onGameTick = function(){
             gkBlue = getGK(BLUE, false); 
             isGKgot = true;
 
+        }
+
+    }
+
+    if (room.getPlayerList() === 0) return;
+
+    for(const [id, player] of InGameAFKData){
+
+        let pos = room.getPlayer(id).position;
+        if (!pos) return; // Spectator
+
+        // First time: save coords
+        if (player.lastX === null) {
+            player.lastX = pos.x;
+            player.lastY = pos.y;
+            player.lastMoveTick = 0;
+            return;
+        }
+
+        // Check if moved
+        const PixelTolerance = 3;
+        if (Math.abs(pos.x - player.lastX) > PixelTolerance || Math.abs(pos.y - player.lastY) > PixelTolerance) {
+
+            // Reset AFK info
+            player.lastX = pos.x;
+            player.lastY = pos.y;
+            player.lastMoveTick = 0;
+            player.warned = false;
+            return;
+
+        }
+
+        // Check Time
+        player.lastMoveTick++;
+        let secondsAfk = player.lastMoveTick / 60;
+
+        // ADVERTENCIA
+        if (!player.warned && secondsAfk >= AFK_TIME_KICK/2) {
+            room.sendAnnouncement("[⚠] si estás quieto mucho tiempo vas a ser kickeado, movete si estás jugando.", id, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+            player.warned = true;
+        }
+
+        // KICK
+        if (secondsAfk >= AFK_TIME_KICK) {
+            room.kickPlayer(id, "AFK 😴", false);
         }
 
     }
@@ -829,6 +914,8 @@ function getTeamResult(scores){
 }
 
 function fillEmptiestTeam(playerID){
+
+    if(playersAFK.has(playerID)) return;
 
     if(playersTeam[RED].size <= playersTeam[BLUE].size){
 
@@ -1535,8 +1622,8 @@ function updatePickMode(){
 
 function autoFillTeams(){
 
-    while(!areEnoughPlayersInGame() && playersTeam[SPEC].size > 0){
-        fillEmptiestTeam(getFirstFromTeam(SPEC));
+    while(!areEnoughPlayersInGame() && thereAreSpecs()){
+        fillEmptiestTeam(getFirstFromSpec());
     }
 
 }
@@ -1564,6 +1651,10 @@ async function managePlayerLeft(player){
     }
 
     playersInfo.delete(ID);
+    InGameAFKData.delete(ID);
+    if(playersAFK.has(ID)){
+        playersAFK.delete(ID);
+    }
 
     const wasPicker = picking && ID === pickingPlayer;
     const wasSpecWaiting = picking && team === SPEC;
@@ -1578,9 +1669,9 @@ async function managePlayerLeft(player){
 
         sendPickPrompt();
 
-    } else if(!enabledPicks && !areEnoughPlayersInGame() && playersTeam[SPEC].size > 0){
+    } else if(!enabledPicks && !areEnoughPlayersInGame() && thereAreSpecs()){
 
-        fillEmptiestTeam(getFirstFromTeam(SPEC));
+        fillEmptiestTeam(getFirstFromSpec());
 
     }
 
@@ -1596,7 +1687,7 @@ async function managePlayerLeft(player){
 
 function startPickMode(){
 
-    if(areEnoughPlayersInGame() || playersTeam[SPEC].size === 0){
+    if(areEnoughPlayersInGame() || !thereAreSpecs()){
 
         if(picking){
             room.pauseGame(false);
@@ -1686,6 +1777,18 @@ function getPlayerByID(id){
 
 function getFirstFromTeam(team){
     return playersTeam[team].values().next().value;
+}
+
+function getFirstFromSpec(){
+
+    for(const playerID of playersTeam[SPEC]){
+        if(!playersAFK.has(playerID)) return playerID;
+    }
+
+}
+
+function thereAreSpecs(){
+    return playersTeam[SPEC].size - playersAFK.size > 0
 }
 
 function isNumeric(value){
