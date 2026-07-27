@@ -294,6 +294,7 @@ let playersTeam = [
     ];
 
 let adminsList = new Set();
+let VIPList = new Set();
 
 let playersInfo = new Map();
 
@@ -428,9 +429,6 @@ setInterval(() => {
         }
     }
 
-    // ingame AFK management
-
-
 }, 1000);
 
 // EVENTS
@@ -495,6 +493,7 @@ room.onPlayerJoin = async function(player){
     }
 
     if(!enabledPicks && !areEnoughPlayersInGame()){
+
         fillEmptiestTeam(playerID);
     }
 
@@ -567,6 +566,32 @@ room.onPlayerChat = function (player, message, playerName) {
             case "discord":
                 showDiscordMessage(playerID);
             break;
+
+            // VIP
+
+            case "afk":
+
+                if(!VIPList.has(playerID) && !adminsList.has(playerID)){
+                    room.sendAnnouncement(permissionMessage, playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
+                }
+
+                if(!playersTeam[SPEC].has(playerID)){
+                    room.sendAnnouncement("No podes usar este comando mientras jugas.", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
+                }
+
+                if(playersAFK.has(playerID)){
+                    room.sendAnnouncement("Ya no estás afk", playerID, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT);
+                    playersAFK.delete(playerID);
+                    break;
+                }
+
+                room.sendAnnouncement("Estás afk", playerID, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT);
+                playersAFK.add(playerID);
+
+            break;
+            
 
             // Admins Only
 
@@ -680,6 +705,7 @@ room.onGameStart = async function (byPlayer){
 room.onGameStop = function () {
 
     restartGameStats();
+    autoFillTeams();
 
 };
 
@@ -888,6 +914,8 @@ function getTeamResult(scores){
 }
 
 function fillEmptiestTeam(playerID){
+
+    if(playersAFK.has(playerID)) return;
 
     if(playersTeam[RED].size <= playersTeam[BLUE].size){
 
@@ -1594,8 +1622,8 @@ function updatePickMode(){
 
 function autoFillTeams(){
 
-    while(!areEnoughPlayersInGame() && playersTeam[SPEC].size > 0){
-        fillEmptiestTeam(getFirstFromTeam(SPEC));
+    while(!areEnoughPlayersInGame() && thereAreSpecs()){
+        fillEmptiestTeam(getFirstFromSpec());
     }
 
 }
@@ -1624,6 +1652,9 @@ async function managePlayerLeft(player){
 
     playersInfo.delete(ID);
     InGameAFKData.delete(ID);
+    if(playersAFK.has(ID)){
+        playersAFK.delete(ID);
+    }
 
     const wasPicker = picking && ID === pickingPlayer;
     const wasSpecWaiting = picking && team === SPEC;
@@ -1638,9 +1669,9 @@ async function managePlayerLeft(player){
 
         sendPickPrompt();
 
-    } else if(!enabledPicks && !areEnoughPlayersInGame() && playersTeam[SPEC].size > 0){
+    } else if(!enabledPicks && !areEnoughPlayersInGame() && thereAreSpecs()){
 
-        fillEmptiestTeam(getFirstFromTeam(SPEC));
+        fillEmptiestTeam(getFirstFromSpec());
 
     }
 
@@ -1656,7 +1687,7 @@ async function managePlayerLeft(player){
 
 function startPickMode(){
 
-    if(areEnoughPlayersInGame() || playersTeam[SPEC].size === 0){
+    if(areEnoughPlayersInGame() || !thereAreSpecs()){
 
         if(picking){
             room.pauseGame(false);
@@ -1746,6 +1777,18 @@ function getPlayerByID(id){
 
 function getFirstFromTeam(team){
     return playersTeam[team].values().next().value;
+}
+
+function getFirstFromSpec(){
+
+    for(const playerID of playersTeam[SPEC]){
+        if(!playersAFK.has(playerID)) return playerID;
+    }
+
+}
+
+function thereAreSpecs(){
+    return playersTeam[SPEC].size - playersAFK.size > 0
 }
 
 function isNumeric(value){
