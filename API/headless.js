@@ -340,12 +340,17 @@ let ProfitXP = [
 
 // Picks management
 
-const MIN_PLAYERS_FOR_PICKS = 2;
+const MIN_PLAYERS_FOR_PICKS = 12;
 const DEFAULT_TIME_PICK = 15;
 let picking = false;
 let pickingPlayer = null;
 let enabledPicks = false;
 let timePicking = DEFAULT_TIME_PICK;
+
+// AFK Management
+
+let InGameAFKData = new Map(); // { playerID: { lastX, lastY, lastMoveTick, warned } }
+const AFK_TIME_KICK = 15;
 
 // Ranks management
 
@@ -405,7 +410,7 @@ setInterval(() => {
     
     const time = 1;
 
-    // Timers
+    // picker AFK management
     if(picking){
 
         timePicking -= time;
@@ -422,6 +427,8 @@ setInterval(() => {
             room.kickPlayer(pickingPlayer, "[💤] AFK pickeando", false);
         }
     }
+
+    // ingame AFK management
 
 
 }, 1000);
@@ -471,6 +478,13 @@ room.onPlayerJoin = async function(player){
         rank: (await getRank(stats)).toString(),
         rankMessage: (await getRankMessage(stats)).toString(),
         club: stats.id_club
+    });
+
+    InGameAFKData.set(playerID, {
+        lastX: null,
+        lastY: null,
+        lastMoveTick: 0,
+        warned: false
     });
 
     updateTeamsChange(SPEC, playerID);
@@ -683,6 +697,51 @@ room.onGameTick = function(){
             gkBlue = getGK(BLUE, false); 
             isGKgot = true;
 
+        }
+
+    }
+
+    if (room.getPlayerList() === 0) return;
+
+    for(const [id, player] of InGameAFKData){
+
+        let pos = room.getPlayer(id).position;
+        if (!pos) return; // Spectator
+
+        // First time: save coords
+        if (player.lastX === null) {
+            player.lastX = pos.x;
+            player.lastY = pos.y;
+            player.lastMoveTick = 0;
+            return;
+        }
+
+        // Check if moved
+        const PixelTolerance = 3;
+        if (Math.abs(pos.x - player.lastX) > PixelTolerance || Math.abs(pos.y - player.lastY) > PixelTolerance) {
+
+            // Reset AFK info
+            player.lastX = pos.x;
+            player.lastY = pos.y;
+            player.lastMoveTick = 0;
+            player.warned = false;
+            return;
+
+        }
+
+        // Check Time
+        player.lastMoveTick++;
+        let secondsAfk = player.lastMoveTick / 60;
+
+        // ADVERTENCIA
+        if (!player.warned && secondsAfk >= AFK_TIME_KICK/2) {
+            room.sendAnnouncement("[⚠] si estás quieto mucho tiempo vas a ser kickeado, movete si estás jugando.", id, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+            player.warned = true;
+        }
+
+        // KICK
+        if (secondsAfk >= AFK_TIME_KICK) {
+            room.kickPlayer(id, "AFK 😴", false);
         }
 
     }
@@ -1564,6 +1623,7 @@ async function managePlayerLeft(player){
     }
 
     playersInfo.delete(ID);
+    InGameAFKData.delete(ID);
 
     const wasPicker = picking && ID === pickingPlayer;
     const wasSpecWaiting = picking && team === SPEC;
