@@ -267,7 +267,8 @@ const textColor = {
     SUCCESS: 0x58C78E,
     GAME: 0xEDE06D,
     RED: 0xFF6363,
-    BLUE: 0x708DFF
+    BLUE: 0x708DFF,
+    HELP: 0xe8a436
 };
 
 const textSound = {
@@ -323,6 +324,50 @@ const MVPpoints = {
     clean_sheet: 3
 
 }
+
+// Vote management
+
+const VOTE_TIMEOUT = 20;
+
+const ADMIN = 0;
+const KICK = 1;
+const BAN = 2;
+
+const voteTime = [
+    0,
+    0,
+    0
+];
+
+const votePlayers = [
+    {},
+    {},
+    {}
+]
+
+const votes = [
+    0,
+    0,
+    0
+];
+
+const reason = [
+    "",
+    "",
+    ""
+];
+
+const voting = [
+    false,
+    false,
+    false
+];
+
+const minVotes = [
+    0,
+    0,
+    0
+]
 
 // Game management
 
@@ -427,6 +472,12 @@ setInterval(() => {
         if(timePicking <= 0){
             room.kickPlayer(pickingPlayer, "[💤] AFK pickeando", false);
         }
+
+    }
+
+    // Vote timers
+    for(let i = 0; i<voting.length; i++){
+        checkVoteTimer(i, time);
     }
 
 }, 1000);
@@ -560,13 +611,119 @@ room.onPlayerChat = function (player, message, playerName) {
             break;
 
             case "rank":
-                showRank(playerID);
+
+                if(words.length === 1){
+                    showRank(playerID);
+                    break;
+                }
+
+                let subCommand = words[1];
+
+                switch(subCommand){
+
+                    case "help":
+                        room.sendAnnouncement("!rank: para ver tu rango actual\n!rank puntos: para ver cuánta XP te da cada estadística.\n!rank info: para ver cuánta XP necesitas para cada rango.", playerID, textColor.HELP, textFont.BOLD, textSound.NORMAL);
+                    break;
+
+                    case "info":
+                        for(i = 0; i<RANKS.length; i++){
+
+                            if(RANKS[i].max == Infinity){
+                                room.sendAnnouncement(RANKS[i].display + ": " + RANKS[i].min, playerID, textColor.HELP, textFont.BOLD, textSound.NORMAL);
+                                continue;
+                            }
+                            
+                            if(RANKS[i].min == -Infinity){
+                                room.sendAnnouncement(RANKS[i].display + ": " + RANKS[i].max, playerID, textColor.HELP, textFont.BOLD, textSound.NORMAL);
+                                continue;
+                            }
+
+                            room.sendAnnouncement(RANKS[i].display + ": " + RANKS[i].min + " A " + (RANKS[i].max - 1), playerID, textColor.HELP, textFont.BOLD, textSound.NORMAL);
+                        }
+                    break;
+
+                    case "puntos":
+                        room.sendAnnouncement("Gol +2\nAsistencia +1\nGol en contra -2\nValla invicta +4\nPartido abandonado -5", playerID, textColor.HELP, textFont.NORMAL, textSound.NORMAL);
+                        room.sendAnnouncement("La xp por partidos ganados y perdidos dependerá de la XP del otro equipo.", playerID, textColor.HELP, textFont.BOLD, textSound.NORMAL);
+                    break;
+
+                    default:
+                        room.sendAnnouncement("comando desconocido, utiliza !rank help para mas información sobre los rangos", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+
+                }
+                
             break;
 
             case "discord":
                 showDiscordMessage(playerID);
             break;
 
+            case "pagina":
+                showPageMessage(playerID);
+            break;
+
+            case "gks":
+
+                let announced = playerID;
+                if(!adminsList.has(playerID)) announced = null;                
+
+                if(gkRed != -1){
+                    room.sendAnnouncement("GK RED: " + getPlayerByID(gkRed).name, announced, textColor.RED, textFont.BOLD, textSound.NORMAL);
+                } else{
+                    room.sendAnnouncement("EL RED NO TIENE GK", announced, textColor.RED, textFont.BOLD, textSound.NORMAL);
+                }
+
+                if(gkBlue != -1){
+                    room.sendAnnouncement("GK BLUE: " + getPlayerByID(gkBlue).name, announced, textColor.BLUE, textFont.BOLD, textSound.NORMAL);
+                } else{
+                    room.sendAnnouncement("EL BLUE NO TIENE GK", announced, textColor.BLUE, textFont.BOLD, textSound.NORMAL);
+                }
+
+            break;
+
+            case "llamaradmin":
+
+                let players = room.getPlayerList();
+
+                if (votePlayers[ADMIN][playerID]){
+                    room.sendAnnouncement("[📞] Ya votaste para llamar un administrador!", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);   
+                    break;
+                }
+
+                voteTime[ADMIN] = VOTE_TIMEOUT; // Reiniciar contador
+                votePlayers[ADMIN][playerID] = true;
+                votes[ADMIN]++;
+
+                if(!voting[ADMIN]){ // init votation
+
+                    reason[ADMIN] = words.slice(1).join(' ');
+                    minVotes[ADMIN] = Math.ceil(players.length / 2)
+                    voting[ADMIN] = true;
+
+                    room.sendAnnouncement("[📞] Se inició una llamada para admin ( 1 / " + minVotes[ADMIN] + " )\nRazón: " + words.slice(1).join(' '), null, textColor.HELP, textFont.BOLD, textSound.IMPORTANT)   
+
+                } else {
+                    room.sendAnnouncement("[📞] " + player.name + " votó para llamar un administrador ( " + votes[ADMIN] + " / " + minVotes[ADMIN] + " )", null, textColor.HELP, textFont.BOLD, textSound.IMPORTANT)   
+                }
+            
+                if(votes[ADMIN] >= minVotes[ADMIN] && voting[ADMIN]){ // Se llegan a los votos necesarios
+
+                    room.sendAnnouncement("[📞] SE ACABA DE LLAMAR UN ADMINSTRADOR", null, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT)   
+                    
+                    // here: discord webHook logic to call admin
+                    /*sendWebhook(
+                        'adminCalls',
+                        'LLAMADAS ADMINISTRADORES',
+                        "Se ha solicitado un <@&1188258083823157309>\nRazón principal: " + reason
+                    );*/
+
+                    voting[ADMIN] = false;
+                    votes[ADMIN] = 0;
+                    votePlayers[ADMIN] = {};
+                    reason[ADMIN] = '';
+                }
+
+            break;
             // VIP
 
             case "afk":
@@ -881,12 +1038,16 @@ async function calculateXPGains(){
 
 }
 
+function getExpectedWinRate(ratingA, ratingB){
+    return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
+}
+
 function showDiscordMessage(playerID){
     room.sendAnnouncement("💬 Discord Link: ➡ https://discord.gg/ ⬅", playerID, 0xF6FF43, textFont.BOLD, textSound.NORMAL);
 }
 
-function getExpectedWinRate(ratingA, ratingB){
-    return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
+function showPageMessage(playerID){
+    room.sendAnnouncement("✨ Página EFT: ➡  ⬅", playerID, 0xF6FF43, textFont.BOLD, textSound.NORMAL);
 }
 
 function delay(time) {
@@ -1588,6 +1749,29 @@ function areEnoughPlayersInGame(){
 
 }
 
+function checkVoteTimer(value, time){
+    if(!voting[value]) {
+        return;
+    }
+
+    voteTime[value] -= time;
+
+    if(voteTime[value] <= 0){
+        voteTime[value] = 0;
+        voting[value] = false;
+        room.sendAnnouncement("[❌] VOTACIÓN: no se llegaron a los votos necesarios", pickingPlayer, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+    }
+    
+}
+
+function autoFillTeams(){
+    
+    while(!areEnoughPlayersInGame() && thereAreSpecs()){
+        fillEmptiestTeam(getFirstFromSpec());
+    }
+    
+}
+
 function updatePickMode(){
 
     const totalPlayers = room.getPlayerList().length;
@@ -1620,16 +1804,8 @@ function updatePickMode(){
 
 }
 
-function autoFillTeams(){
-
-    while(!areEnoughPlayersInGame() && thereAreSpecs()){
-        fillEmptiestTeam(getFirstFromSpec());
-    }
-
-}
-
 async function managePlayerLeft(player){
-
+    
     const ID = player.id;
     const team = player.team;
     const auth = getAuth(ID);
