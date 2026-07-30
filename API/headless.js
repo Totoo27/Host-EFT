@@ -330,44 +330,39 @@ const MVPpoints = {
 const VOTE_TIMEOUT = 20;
 
 const ADMIN = 0;
-const KICK = 1;
-const BAN = 2;
+const BAN = 1;
 
 const voteTime = [
-    0,
     0,
     0
 ];
 
 const votePlayers = [
     {},
-    {},
     {}
 ]
 
 const votes = [
-    0,
     0,
     0
 ];
 
 const reason = [
     "",
-    "",
     ""
 ];
 
 const voting = [
-    false,
     false,
     false
 ];
 
 const minVotes = [
     0,
-    0,
     0
 ]
+
+let voteKickID = -1;
 
 // Game management
 
@@ -682,31 +677,10 @@ room.onPlayerChat = function (player, message, playerName) {
             break;
 
             case "llamaradmin":
-
-                let players = room.getPlayerList();
-
-                if (votePlayers[ADMIN][playerID]){
-                    room.sendAnnouncement("[📞] Ya votaste para llamar un administrador!", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);   
-                    break;
-                }
-
-                voteTime[ADMIN] = VOTE_TIMEOUT; // Reiniciar contador
-                votePlayers[ADMIN][playerID] = true;
-                votes[ADMIN]++;
-
-                if(!voting[ADMIN]){ // init votation
-
-                    reason[ADMIN] = words.slice(1).join(' ');
-                    minVotes[ADMIN] = Math.ceil(players.length / 2)
-                    voting[ADMIN] = true;
-
-                    room.sendAnnouncement("[📞] Se inició una llamada para admin ( 1 / " + minVotes[ADMIN] + " )\nRazón: " + words.slice(1).join(' '), null, textColor.HELP, textFont.BOLD, textSound.IMPORTANT)   
-
-                } else {
-                    room.sendAnnouncement("[📞] " + player.name + " votó para llamar un administrador ( " + votes[ADMIN] + " / " + minVotes[ADMIN] + " )", null, textColor.HELP, textFont.BOLD, textSound.IMPORTANT)   
-                }
+                
+                if(!addVote(ADMIN, playerID, words)) break;
             
-                if(votes[ADMIN] >= minVotes[ADMIN] && voting[ADMIN]){ // Se llegan a los votos necesarios
+                if(votes[ADMIN] >= minVotes[ADMIN] && voting[ADMIN]){
 
                     room.sendAnnouncement("[📞] SE ACABA DE LLAMAR UN ADMINSTRADOR", null, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT)   
                     
@@ -717,13 +691,11 @@ room.onPlayerChat = function (player, message, playerName) {
                         "Se ha solicitado un <@&1188258083823157309>\nRazón principal: " + reason
                     );*/
 
-                    voting[ADMIN] = false;
-                    votes[ADMIN] = 0;
-                    votePlayers[ADMIN] = {};
-                    reason[ADMIN] = '';
+                    resetVotation(ADMIN);
                 }
 
             break;
+
             // VIP
 
             case "afk":
@@ -749,6 +721,26 @@ room.onPlayerChat = function (player, message, playerName) {
 
             break;
             
+            case "voteban":
+
+                if(!VIPList.has(playerID) && !adminsList.has(playerID) && !voting[BAN]){
+                    room.sendAnnouncement(permissionMessage, playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
+                }
+
+                if(words.length < 2){
+                    room.sendAnnouncement("Debes especificar el jugador que quieres banear.", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
+                }
+
+                if(!addVote(BAN, playerID, words)) break;
+
+                if(votes[BAN] >= minVotes[BAN] && voting[BAN]){
+                    room.kickPlayer(voteKickID, "[❌] Expulsado por votación", true);
+                    resetVotation(BAN);
+                }
+                
+            break;
 
             // Admins Only
 
@@ -797,7 +789,6 @@ room.onPlayerChat = function (player, message, playerName) {
                 kickBanPlayer(words, true, playerID);
 
             break;
-
 
             default:
                 room.sendAnnouncement("Comando no existente, utiliza !help para ver los comandos", null, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
@@ -1762,6 +1753,77 @@ function checkVoteTimer(value, time){
         room.sendAnnouncement("[❌] VOTACIÓN: no se llegaron a los votos necesarios", pickingPlayer, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
     }
     
+}
+
+function addVote(value, playerID, words){
+
+    if (votePlayers[value][playerID]){
+        room.sendAnnouncement("[❗] Ya estás dentro de la votación!", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);   
+        return false;
+    }
+
+    voteTime[value] = VOTE_TIMEOUT; // Reiniciar contador
+    votePlayers[value][playerID] = true;
+    votes[value]++;
+
+    let players = room.getPlayerList();
+    
+    if(!voting[value]){ // init votation
+
+        let reasonSlice = 2;
+        if(value === ADMIN){
+            reasonSlice = 1;
+        } else {
+
+            voteKickID = getPlayerIDbyName(words[1].substring(1));
+            if(voteKickID === -1){
+                room.sendAnnouncement("[❌] El jugador mencionado no existe.", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                return false;
+            }
+
+        }
+
+        reason[value] = words.slice(reasonSlice).join(' ');
+        minVotes[value] = Math.ceil(players.length / 2);
+        voting[value] = true;
+
+        
+
+        room.sendAnnouncement("[📝] Se inició una votación para " + getVoteMessage(value) + " ( 1 / " + minVotes[value] + " )\nRazón: " + reason[value], null, textColor.HELP, textFont.BOLD, textSound.IMPORTANT);
+
+    } else {
+
+        if(voteKickID != getPlayerIDbyName(words[1].substring(1)) && value !== ADMIN){
+            room.sendAnnouncement("[❌] Ese no es el jugador de la votación.", null, textColor.HELP, textFont.BOLD, textSound.IMPORTANT);
+            return false;
+        }
+
+        room.sendAnnouncement("[📝] " + getPlayerByID(playerID).name + " votó para " + getVoteMessage(value) + " ( " + votes[value] + " / " + minVotes[value] + " )", null, textColor.HELP, textFont.BOLD, textSound.IMPORTANT);
+    }
+
+    return true;
+}
+
+function resetVotation(value){
+
+    voting[value] = false;
+    votes[value] = 0;
+    votePlayers[value] = {};
+    reason[value] = '';
+    
+}
+
+function getVoteMessage(value){
+    switch(value){
+        case ADMIN:
+        return "llamar un administrador";
+
+        case BAN:
+        return "banear a " + getPlayerByID(voteKickID)?.name;
+
+        default:
+            return "ERROR";
+    }
 }
 
 function autoFillTeams(){
