@@ -15,6 +15,21 @@ async function buscarRemera(id) {
     
 }
 
+async function buscarRemeraPorNombre(nombre) {
+
+    const [remeras] = await database.query(
+            "SELECT * FROM Remeras WHERE nombre = ?",
+            [nombre]
+        );
+
+    if(remeras.length === 0){
+        return false;
+    }
+
+    return remeras[0];
+    
+}
+
 async function getCantRemeras() {
 
     const [remeras] = await database.query(
@@ -28,6 +43,7 @@ async function getCantRemeras() {
 module.exports = {
 
     buscarRemera,
+    buscarRemeraPorNombre,
     getCantRemeras
 
 };

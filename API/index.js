@@ -116,13 +116,31 @@ app.get("/frases/buscar/:tipoFrase", async (req, res) => {
 
 });
 
-app.get("/remera/buscar/:id", async (req, res) => {
+app.get("/remera/buscarID/:id", async (req, res) => {
 
     try {
 
         const id = req.params.id;
 
         const result = await remeraService.buscarRemera(id);
+
+        return res.status(200).json(result);
+
+    } catch(err) {
+
+        return res.status(500).json(err);
+
+    }
+
+});
+
+app.get("/remera/buscarNombre/:nombre", async (req, res) => {
+
+    try {
+
+        const nombre = req.params.nombre;
+
+        const result = await remeraService.buscarRemeraPorNombre(nombre);
 
         return res.status(200).json(result);
 

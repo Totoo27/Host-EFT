@@ -367,6 +367,7 @@ let voteKickID = -1;
 // Game management
 
 let isGameStarted = false;
+let jerseyNames = ["", ""];
 
 // Teams management
 
@@ -575,35 +576,6 @@ room.onPlayerKicked = async function (kickedPlayer, reason, ban, byPlayer) {
 
 };
 
-room.onTeamGoal = async function(team){
-
-    await manageGoalStatsAndDisplay(team);
-
-};
-
-room.onTeamVictory = async function(scores){
-
-    const result = getTeamResult(scores);
-    const winningTeam = result.winner;
-    const loosingTeam = result.loser;
-
-    await saveGameStats(winningTeam);
-
-    autoStop();
-
-    moveLosersToSpec(loosingTeam);
-    if(winningTeam === BLUE){
-        movePlayersToStreak(BLUE, RED);
-    }
-
-    updatePickMode();
-
-    if(!enabledPicks){
-        moveSpecToTeam(BLUE);
-    }
-
-};
-
 room.onPlayerChat = function (player, message, playerName) {
 
     const permissionMessage = "No tenés los permisos para realizar este comando.";
@@ -780,6 +752,31 @@ room.onPlayerChat = function (player, message, playerName) {
 
             // Admins Only
 
+            case "camis":
+
+                if(!adminsList.has(playerID)){
+                    room.sendAnnouncement(permissionMessage, playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
+                }
+
+                changeJersey(words, playerID);
+
+            break;
+
+            case "rc":
+
+                if(!adminsList.has(playerID)){
+                    room.sendAnnouncement(permissionMessage, playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
+                }
+
+                setRandomJerseys();
+                room.sendAnnouncement("[🔰] SE CAMBIARON LAS CAMISETAS:", null, textColor.SUCCESS, textFont.BOLD, textSound.NORMAL);
+                room.sendAnnouncement("[🔴] " + jerseyNames[0] + " VS " + jerseyNames[1] + " [🔵]", null, textColor.SUCCESS, textFont.BOLD, textSound.MUTE);
+
+
+            break;
+
             case "rr":
 
                 if(!adminsList.has(playerID)){
@@ -867,6 +864,37 @@ room.onPlayerChat = function (player, message, playerName) {
 
 };
 
+
+room.onTeamGoal = async function(team){
+
+    await manageGoalStatsAndDisplay(team);
+
+};
+
+room.onTeamVictory = async function(scores){
+
+    const result = getTeamResult(scores);
+    const winningTeam = result.winner;
+    const loosingTeam = result.loser;
+
+    await saveGameStats(winningTeam);
+
+    autoStop();
+
+    moveLosersToSpec(loosingTeam);
+    if(winningTeam === BLUE){
+        movePlayersToStreak(BLUE, RED);
+    }
+
+    updatePickMode();
+
+    if(!enabledPicks){
+        moveSpecToTeam(BLUE);
+    }
+
+};
+
+
 room.onPlayerTeamChange = function (changedPlayer, byPlayer){
 
     updateTeamsChange(changedPlayer.team, changedPlayer.id);
@@ -880,7 +908,10 @@ room.onPlayerBallKick = function (player) {
 
 room.onGameStart = async function (byPlayer){
 
-    await initJerseys();
+    await setRandomJerseys();
+    room.sendAnnouncement("[🔰] PARTIDO:", null, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
+    room.sendAnnouncement("[🔴] " + jerseyNames[0] + " VS " + jerseyNames[1] + " [🔵]", null, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
+
     await calculateXPGains();
     updatePickMode();
 
@@ -990,11 +1021,49 @@ async function showTopPlayers(words, playerID){
 
 }
 
-async function initJerseys(){
+async function changeJersey(words, playerID){
+
+    if(words.length < 3 || (words[1] != "blue" && words[1] != "red")){
+        room.sendAnnouncement("para usar el comando tenes que hacer: !camis (red / blue) nombreCamiseta", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+        room.sendAnnouncement("Ejemplo: !camis red Boca Juniors", playerID, textColor.ERROR, textFont.BOLD, textSound.MUTE);
+        room.sendAnnouncement("si en el nombre de la camiseta pones 'random' se cambia por una camiseta aleatoria", playerID, textColor.ERROR, textFont.BOLD, textSound.MUTE);
+        return;
+    }
+
+    const team = words[1] == "red" ? 1 : 2;
+    let jerseyData;
+
+    if(words[2] == "random"){
+
+        const jerseyAmount = await API.getAmountJerseys();
+        jerseyData = await API.searchJerseyByID(randomIntFromInterval(1, jerseyAmount));
+
+    } else {
+
+        jerseyData = await API.searchJerseyByName(words.slice(2).join(' '));
+
+        if(!jerseyData){
+            room.sendAnnouncement("La remera ingresada no existe.", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+            return;
+        }
+    }
+    
+    const jersey = JSON.parse(jerseyData.color);
+
+    room.setTeamColors(
+        team,
+        jersey[0],
+        parseInt(jersey[1], 16),
+        jersey.slice(2).map(c => parseInt(c, 16))
+    );
+
+    room.sendAnnouncement("Se cambiaron la camiseta del " + words[1] + " a " + jerseyData.nombre, null, textColor.SUCCESS, textFont.NORMAL, textSound.IMPORTANT);
+
+}
+
+async function setRandomJerseys(){
 
     const jerseyAmount = await API.getAmountJerseys();
-
-    let jerseyNames = ["", ""];
     let randomJerseyID = [-1, -1];
 
     randomJerseyID[0] = randomIntFromInterval(1, jerseyAmount);
@@ -1020,9 +1089,6 @@ async function initJerseys(){
         jerseyNames[i-1] = jerseyData.nombre;
 
     }
-
-    room.sendAnnouncement("[🔰] PARTIDO:", null, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
-    room.sendAnnouncement("[🔴] " + jerseyNames[0] + " VS " + jerseyNames[1] + " [🔵]", null, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
 
 }
 
@@ -2196,7 +2262,7 @@ const API = {
     async searchJerseyByID(id){
 
         const response = await fetch(
-            `http://localhost:${APIPort}/remera/buscar/${id}`,
+            `http://localhost:${APIPort}/remera/buscarID/${id}`,
             {
                 method: "GET",
                 headers: {
@@ -2207,6 +2273,21 @@ const API = {
 
         return await response.json();
 
+    },
+
+    async searchJerseyByName(name){
+        
+        const response = await fetch(
+            `http://localhost:${APIPort}/remera/buscarNombre/${name}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+            }
+        )
+
+        return await response.json();
     },
 
     async getAmountJerseys(){
