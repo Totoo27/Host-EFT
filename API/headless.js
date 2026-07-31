@@ -368,6 +368,10 @@ let voteKickID = -1;
 
 let isGameStarted = false;
 let jerseyNames = ["", ""];
+let averageXP = [
+        0,
+        0
+    ]
 
 // Teams management
 
@@ -537,7 +541,7 @@ room.onPlayerJoin = async function(player){
         auth: auth.toString(),
         conn: player.conn.toString(),
         stats: stats,
-        rank: (await getRank(stats)).toString(),
+        rank: (await getRank(stats.xp)).toString(),
         rankMessage: (await getRankMessage(stats)).toString(),
         commandCooldown: 0,
         club: stats.id_club
@@ -702,6 +706,10 @@ room.onPlayerChat = function (player, message, playerName) {
 
                 showTopPlayers(words, playerID);
 
+            break;
+
+            case "partido":
+                showMatchInfo(playerID);
             break;
 
             // VIP
@@ -909,9 +917,7 @@ room.onPlayerBallKick = function (player) {
 room.onGameStart = async function (byPlayer){
 
     await setRandomJerseys();
-    room.sendAnnouncement("[🔰] PARTIDO:", null, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
-    room.sendAnnouncement("[🔴] " + jerseyNames[0] + " VS " + jerseyNames[1] + " [🔵]", null, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
-
+    showMatchInfo();
     await calculateXPGains();
     updatePickMode();
 
@@ -1057,7 +1063,17 @@ async function changeJersey(words, playerID){
         jersey.slice(2).map(c => parseInt(c, 16))
     );
 
+    jerseyNames[team-1] = jerseyData.nombre;
+
     room.sendAnnouncement("Se cambiaron la camiseta del " + words[1] + " a " + jerseyData.nombre, null, textColor.SUCCESS, textFont.NORMAL, textSound.IMPORTANT);
+
+}
+
+async function showMatchInfo(playerID){
+
+    room.sendAnnouncement("[🔰] PARTIDO:", playerID, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
+    room.sendAnnouncement("[🔴] " + jerseyNames[RED-1] + " [" + (await getRank(averageXP[RED-1])).toString() + "]", playerID, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
+    room.sendAnnouncement("[🔵] " + jerseyNames[BLUE-1] + " [" + (await getRank(averageXP[BLUE-1])).toString() + "]", playerID, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
 
 }
 
@@ -1114,7 +1130,7 @@ async function calculateXPGains(){
     const TEAMS_AMOUNT = 2;
     const PLAYERS_AMOUNT = 4;
 
-    let averageXP = [
+    averageXP = [
         0,
         0
     ]
@@ -1621,8 +1637,9 @@ async function showStats(playerInfo){
 async function showRank(playerInfo){
 
     const rankMessage = playerInfo.rankMessage;
+    const nombre = playerInfo.stats.nombre;
 
-    room.sendAnnouncement("--- Rango de " + playerInfo.nombre + " ---", null, textColor.STATS, textFont.NORMAL, textSound.MUTE);
+    room.sendAnnouncement("--- Rango de " + nombre + " ---", null, textColor.STATS, textFont.NORMAL, textSound.MUTE);
     room.sendAnnouncement(rankMessage, null, textColor.STATS, textFont.NORMAL, textSound.NORMAL);
 
 }
@@ -1639,7 +1656,7 @@ async function getRankProgress(player) {
         return null;
     }
 
-    const currentRank = (await getRank(player)).toString();
+    const currentRank = (await getRank(XP)).toString();
 
     if (rank.name === "LEGEND") {
         return {
@@ -1728,7 +1745,7 @@ async function getRankMessage(player) {
     if (info.nextRank === "MAX") {
         xpLine = `[ ${info.currentXP} ]`;
     } else {
-        xpLine = ` ${info.currentXP} / ${info.nextXP}]`;
+        xpLine = ` ${info.currentXP} / ${info.nextXP}`;
     }
 
     return (
@@ -1739,9 +1756,7 @@ async function getRankMessage(player) {
     );
 }
 
-async function getRank(player){
-
-    const XP = player.xp;
+async function getRank(XP){
 
     const rank = RANKS.find(
         rank => XP >= rank.min && XP < rank.max
@@ -1834,8 +1849,6 @@ function getAuth(playerId) {
 }
 
 function areEnoughPlayersInGame(){
-
-    return true;
 
     const PLAYER_AMOUNT = 4;
 
@@ -1979,7 +1992,7 @@ async function managePlayerLeft(player){
     const team = player.team;
     const auth = getAuth(ID);
 
-    if(team !== SPEC && isGameStarted){
+    if(team !== SPEC && isGameStarted && areEnoughPlayersInGame()){
         await API.updatePlayerStats(auth, "partidos_abandonados");
     }
 
@@ -2340,7 +2353,7 @@ const API = {
 
         // update cache of player rank
         player.stats = await API.searchPlayer(auth);
-        player.rank = (await getRank(player.stats)).toString(),
+        player.rank = (await getRank(player.stats.xp)).toString(),
         player.rankMessage = (await getRankMessage(player.stats)).toString();
 
     },
