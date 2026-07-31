@@ -452,22 +452,13 @@ setInterval(() => {
     const time = 1;
 
     // picker AFK management
-    if(picking){
+    updatePickTimer(time);
 
-        timePicking -= time;
-
-        if(pickingPlayer == null){
-            return;
+    // Command timer
+    for(const [id, info] of playersInfo){
+        if(info.commandCooldown > 0){
+            info.commandCooldown -= time;
         }
-
-        if(timePicking == Math.floor(DEFAULT_TIME_PICK/2)){
-            room.sendAnnouncement("[⚠] Si no elegís a un jugador vas a ser kickeado por afk", pickingPlayer, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
-        }
-
-        if(timePicking <= 0){
-            room.kickPlayer(pickingPlayer, "[💤] AFK pickeando", false);
-        }
-
     }
 
     // Vote timers
@@ -475,7 +466,31 @@ setInterval(() => {
         checkVoteTimer(i, time);
     }
 
+    
+
 }, 1000);
+
+function updatePickTimer(time){
+
+    if(!picking){
+        return;
+    }
+
+    timePicking -= time;
+
+    if(pickingPlayer == null){
+        return;
+    }
+
+    if(timePicking == Math.floor(DEFAULT_TIME_PICK/2)){
+        room.sendAnnouncement("[⚠] Si no elegís a un jugador vas a ser kickeado por afk", pickingPlayer, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+    }
+
+    if(timePicking <= 0){
+        room.kickPlayer(pickingPlayer, "[💤] AFK pickeando", false);
+    }
+
+}
 
 // EVENTS
 
@@ -516,11 +531,14 @@ room.onPlayerJoin = async function(player){
         room.setPlayerAdmin(playerID, true);
     }
 
+    // Load cache & info for player
     playersInfo.set(playerID, {
         auth: auth.toString(),
         conn: player.conn.toString(),
+        stats: stats,
         rank: (await getRank(stats)).toString(),
         rankMessage: (await getRankMessage(stats)).toString(),
+        commandCooldown: 0,
         club: stats.id_club
     });
 
@@ -591,9 +609,21 @@ room.onPlayerChat = function (player, message, playerName) {
     const permissionMessage = "No tenés los permisos para realizar este comando.";
     const playerID = player.id;
     const words = message.split(" ");
+    const cooldown = 5;
+    const playerInfo = playersInfo.get(playerID);
 
     // Commands
     if (message.charAt(0) == '!') {
+
+        if(playerInfo.commandCooldown > 0){
+            room.sendAnnouncement("Tenés que esperar " + cooldown + " segundos antes de usar otro comando.", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+            return false;
+        }
+
+        if(!adminsList.has(playerID)){
+            playerInfo.commandCooldown = cooldown;
+        }
+
         switch (words[0].substring(1)) {
 
             case "nv":
@@ -602,13 +632,13 @@ room.onPlayerChat = function (player, message, playerName) {
             break;
 
             case "stats":
-                showStats(playerID);
+                showStats(playerInfo);
             break;
 
             case "rank":
 
                 if(words.length === 1){
-                    showRank(playerID);
+                    showRank(playerInfo);
                     break;
                 }
 
@@ -698,7 +728,7 @@ room.onPlayerChat = function (player, message, playerName) {
 
             case "top":
 
-                showTopPlayers(words);
+                showTopPlayers(words, playerID);
 
             break;
 
@@ -825,7 +855,7 @@ room.onPlayerChat = function (player, message, playerName) {
     let color = textColor.NORMAL;
     let font = textFont.NORMAL;
     let teamEmoji = getTeamEmoji(player.team);
-    let rank = playersInfo.get(playerID).rank;
+    let rank = playerInfo.rank;
 
     if(adminsList.has(playerID)){
         color = textColor.ADMIN;
@@ -939,17 +969,23 @@ room.onStadiumChange = function(newStadiumName, byPlayer) {
 
 // FUNCTIONS 
 
-async function showTopPlayers(words){
+async function showTopPlayers(words, playerID){
+    
+    if(words[1] == 'help'){
+        room.sendAnnouncement("!top goles\n!top asistencias\n!top gec\n!top mvps\n!top vallas\n!top pj (partidos jugados)\n!top pg (partidos ganados)\n!top pp (partidos perdidos)\n!top pa (partidos arquero)\n!top pab (partidos abandonados)\n!top xp\n!top monedas", playerID, textColor.STATS, textFont.BOLD, textSound.NORMAL);
+        return;
+    }
 
     const top = await API.getTopStats(words[1]);
 
     if(!top){
-        console.log("no existe");
+        room.sendAnnouncement("Esa estadística no existe, usa !top help para conocer los distintos tops.", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
         return;
     } 
 
+    room.sendAnnouncement("📊 Top " + words[1], playerID, textColor.STATS, textFont.BOLD, textSound.IMPORTANT);
     for(let i = 0; i<top[0].length; i++){
-        console.log(top[0][i].nombre + ": " + top[0][i].stat);
+        room.sendAnnouncement((i+1) + " - " + top[0][i].nombre + ": " + top[0][i].stat + " " + words[1], playerID, textColor.STATS, textFont.NORMAL, textSound.MUTE);
     }
 
 }
@@ -1498,48 +1534,30 @@ function isGK(playerID){
     return playerID === gkRed || playerID === gkBlue;
 }
 
-async function showStats(playerID){
+async function showStats(playerInfo){
 
-    const auth = getAuth(playerID);
+    const stats = playerInfo.stats;
 
-    if(!(await playerExists(auth))){
-        room.sendAnnouncement("ERROR: No estas cargado en la base de datos", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
-        return;
-    }
-
-    const player = await API.searchPlayer(auth);
-
-    room.sendAnnouncement("--- Estadísticas de " + player.nombre + " ---", null, textColor.STATS, textFont.NORMAL, textSound.MUTE);
+    room.sendAnnouncement("--- Estadísticas de " + stats.nombre + " ---", null, textColor.STATS, textFont.NORMAL, textSound.MUTE);
     room.sendAnnouncement(
     `
-    G⚽: ${player.goles} | A👟:  ${player.asistencias} | EC🤡: ${player.goles_en_contra} | MVP🏆: ${player.mvps}
-    PJ: ${player.partidos_jugados} | PG✅: ${player.partidos_ganados} | PP❌: ${player.partidos_perdidos} | DF💩: ${player.partidos_abandonados}
-    PA🧤: ${player.partidos_arquero} | VI🥅: ${player.vallas_invictas}
+    G⚽: ${stats.goles} | A👟:  ${stats.asistencias} | EC🤡: ${stats.goles_en_contra} | MVP🏆: ${stats.mvps}
+    PJ: ${stats.partidos_jugados} | PG✅: ${stats.partidos_ganados} | PP❌: ${stats.partidos_perdidos} | DF💩: ${stats.partidos_abandonados}
+    PA🧤: ${stats.partidos_arquero} | VI🥅: ${stats.vallas_invictas}
 
-    💲 ${player.monedas}
-    XP🔰: ${player.xp}
+    💲 ${stats.monedas}
+    XP🔰: ${stats.xp}
     `, null, textColor.STATS, textFont.SMALL, textSound.NORMAL
     );
 
-    console.log(await getRank(player));
-
 }
 
-async function showRank(playerID){
+async function showRank(playerInfo){
 
-    const auth = getAuth(playerID);
+    const rankMessage = playerInfo.rankMessage;
 
-    if(!(await playerExists(auth))){
-        room.sendAnnouncement("ERROR: No estas cargado en la base de datos", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
-        return;
-    }
-
-    const player = await API.searchPlayer(auth);
-    const rankMessage = playersInfo.get(playerID).rankMessage;
-
-    room.sendAnnouncement("--- Rango de " + player.nombre + " ---", null, textColor.STATS, textFont.NORMAL, textSound.MUTE);
+    room.sendAnnouncement("--- Rango de " + playerInfo.nombre + " ---", null, textColor.STATS, textFont.NORMAL, textSound.MUTE);
     room.sendAnnouncement(rankMessage, null, textColor.STATS, textFont.NORMAL, textSound.NORMAL);
-
 
 }
 
@@ -1635,8 +1653,8 @@ function generateXPBar(progress, size = 11) {
 }
 
 async function getRankMessage(player) {
-    const info = await getRankProgress(player);
 
+    const info = await getRankProgress(player);
     const bar = generateXPBar(info.progress);
 
     let xpLine;
@@ -1750,6 +1768,8 @@ function getAuth(playerId) {
 }
 
 function areEnoughPlayersInGame(){
+
+    return true;
 
     const PLAYER_AMOUNT = 4;
 
@@ -2078,6 +2098,15 @@ function randomIntFromInterval(min, max) {
     return Math.floor(Math.random() * (max - min + 1) + min)
 }
 
+function getPlayerInfoByAuth(auth) {
+    for (const [playerID, info] of playersInfo) {
+        if (info.auth === auth.toString()) {
+            return info;
+        }
+    }
+    return null;
+}
+
 const API = {
 
     async createPlayer(name, auth){
@@ -2095,12 +2124,6 @@ const API = {
                 })
             }
         );
-
-        /*
-        console.log(response.status);
-        const data = await response.text();
-        console.log(data);
-        */
     
     },
 
@@ -2120,12 +2143,6 @@ const API = {
             }
         );
 
-        /*
-        console.log(response.status);
-        const data = await response.text();
-        console.log(data);
-        */
-
     },
 
     async searchPlayer(auth){
@@ -2139,8 +2156,6 @@ const API = {
                 },
             }
         )
-
-        //console.log(response.status);
     
         return await response.json();
 
@@ -2222,7 +2237,7 @@ const API = {
         const scores = room.getScores();
         const extra = scores.time >= scores.timeLimit;
 
-        const player = playersInfo.get(auth);
+        const player = getPlayerInfoByAuth(auth);
         const clubId = player.club;
 
         const response = await fetch(
@@ -2243,16 +2258,9 @@ const API = {
         )
 
         // update cache of player rank
-        
-        const stats = await API.searchPlayer(auth);
-        player.rank = (await getRank(stats)).toString(),
-        player.rankMessage = (await getRankMessage(player)).toString();
-
-        /*
-        console.log(response.status);
-        const data = await response.text();
-        console.log(data);
-        */
+        player.stats = await API.searchPlayer(auth);
+        player.rank = (await getRank(player.stats)).toString(),
+        player.rankMessage = (await getRankMessage(player.stats)).toString();
 
     },
 
