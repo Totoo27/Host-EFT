@@ -696,6 +696,12 @@ room.onPlayerChat = function (player, message, playerName) {
 
             break;
 
+            case "top":
+
+                showTopPlayers(words);
+
+            break;
+
             // VIP
 
             case "afk":
@@ -932,6 +938,21 @@ room.onStadiumChange = function(newStadiumName, byPlayer) {
 };
 
 // FUNCTIONS 
+
+async function showTopPlayers(words){
+
+    const top = await API.getTopStats(words[1]);
+
+    if(!top){
+        console.log("no existe");
+        return;
+    } 
+
+    for(let i = 0; i<top[0].length; i++){
+        console.log(top[0][i].nombre + ": " + top[0][i].stat);
+    }
+
+}
 
 async function initJerseys(){
 
@@ -2278,6 +2299,22 @@ const API = {
             }
             
         )
+
+    },
+
+    async getTopStats(estadistica){
+
+        const response = await fetch(
+            `http://localhost:${APIPort}/estadisticas/obtenerTop/${estadistica}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+            }
+        )
+        
+        return await response.json();
 
     }
 

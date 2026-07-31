@@ -205,7 +205,21 @@ app.get("/jugador-rol/buscar/:auth/:rolId", async (req, res) => {
 
 });
 
+app.get("/estadisticas/obtenerTop/:estadistica", async (req, res) => {
 
+    try{
+
+        const limite = 5;
+        const estadistica = req.params.estadistica;
+        const result = await statsService.obtenerTop(estadistica, limite);
+
+        req.res.status(200).json(result);
+
+    } catch(err){
+        return res.status(500).json(err);
+    }
+
+});
 
 app.put("/jugador/agregar-estadistica", async (req, res) => {
 
