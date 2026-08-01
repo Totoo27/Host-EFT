@@ -243,12 +243,13 @@ const roomName = "[⚡] x4 - El futbol de Toto [T1] [⚡]";
 const maxPlayers = 20;
 const scoreLimit = 4;
 const timeLimit = 4;
+const public = false;
 
 var room = HBInit({
 	roomName: roomName,
 	maxPlayers: maxPlayers,
 	noPlayer: true,
-    public: false,
+    public: public,
     geo: {code: "ar", lat: -36, lon:-59.9964}
 });
 
@@ -471,37 +472,23 @@ setInterval(() => {
         checkVoteTimer(i, time);
     }
 
-    
-
 }, 1000);
-
-function updatePickTimer(time){
-
-    if(!picking){
-        return;
-    }
-
-    timePicking -= time;
-
-    if(pickingPlayer == null){
-        return;
-    }
-
-    if(timePicking == Math.floor(DEFAULT_TIME_PICK/2)){
-        room.sendAnnouncement("[⚠] Si no elegís a un jugador vas a ser kickeado por afk", pickingPlayer, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
-    }
-
-    if(timePicking <= 0){
-        room.kickPlayer(pickingPlayer, "[💤] AFK pickeando", false);
-    }
-
-}
 
 // EVENTS
 
 room.onRoomLink = async function(){
 
     room.startGame();
+    if (public && !linkAnunciado){
+
+        linkAnunciado = true;
+        sendWebhook(
+            'linkLog',
+            'EFT HOST',
+            '### <:_:1199143173759451186> SE ABRIÓ EL HOST DE TOTO <:_:1199143173759451186>: ' + link + "  \n\n## ||@everyone|| :fire:"
+        );
+
+    }
 
 };
 
@@ -710,6 +697,10 @@ room.onPlayerChat = function (player, message, playerName) {
 
             case "partido":
                 showMatchInfo(playerID);
+            break;
+
+            case "help":
+                showHelpMessage(playerID);
             break;
 
             // VIP
@@ -1165,6 +1156,32 @@ async function calculateXPGains(){
         room.sendAnnouncement("[🔵] XP: Si ganas +" + ProfitXP[BLUE - 1] + ". Si perdes -" + ProfitXP[RED - 1], playersTeam[BLUE], textColor.STATS, textFont.BOLD, textSound.IMPORTANT);
     }
         
+
+}
+
+function showHelpMessage(playerID){
+    room.sendAnnouncement("Comandos disponibles:\n!nv o !bb: para kitear de la sala\n!stats: para ver tus estadísticas\n!rank help: para ver los comandos relacionados al rango\n!discord: para ver el link del discord\n!pagina: para ver el link de la pagina del host\n!gks: para ver los gks del partido\n!llamaradmin: para comenzar una votación para llamar un administrador\n!top o !top help: para ver los distintos rankings de estadísticas\n!partido: para ver información del partido que se esté jugando", playerID, textColor.HELP, textFont.BOLD, textSound.NORMAL);
+}
+
+function updatePickTimer(time){
+
+    if(!picking){
+        return;
+    }
+
+    timePicking -= time;
+
+    if(pickingPlayer == null){
+        return;
+    }
+
+    if(timePicking == Math.floor(DEFAULT_TIME_PICK/2)){
+        room.sendAnnouncement("[⚠] Si no elegís a un jugador vas a ser kickeado por afk", pickingPlayer, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+    }
+
+    if(timePicking <= 0){
+        room.kickPlayer(pickingPlayer, "[💤] AFK pickeando", false);
+    }
 
 }
 
