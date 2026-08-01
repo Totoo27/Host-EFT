@@ -36,38 +36,20 @@ const GANANCIA_MONEDAS = {
 
 }
 
-const estadisticasValidas = {
-    goles: "goles",
+const estadisticasValidas = [
 
-    asistencias: "asistencias",
+    "goles",
+    "asistencias",
+    "goles_en_contra",
+    "mvps",
+    "vallas_invictas",
+    "partidos_jugados",
+    "partidos_ganados",
+    "partidos_perdidos",
+    "partidos_arquero",
+    "partidos_abandonados"
 
-    goles_en_contra: "goles_en_contra",
-    gec: "goles_en_contra",
-
-    mvps: "mvps",
-
-    vallas_invictas: "vallas_invictas",
-    vallas: "vallas_invictas",
-
-    partidos_jugados: "partidos_jugados",
-    pj: "partidos_jugados",
-
-    partidos_ganados: "partidos_ganados",
-    pg: "partidos_ganados",
-
-    partidos_perdidos: "partidos_perdidos",
-    pp: "partidos_perdidos",
-
-    partidos_arquero: "partidos_arquero",
-    pa: "partidos_arquero",
-
-    partidos_abandonados: "partidos_abandonados",
-    pab: "partidos_abandonados",
-
-    xp: "xp",
-
-    monedas: "monedas"
-};
+];
 
 async function actualizarXP(auth, xp, temporada, clubId){
 
@@ -88,7 +70,7 @@ async function actualizarXP(auth, xp, temporada, clubId){
 
 async function agregarEstadistica(estadistica, auth, temporada, extra, clubId){
 
-    const columna = existeEstadistica(estadistica);
+    existeEstadistica(estadistica);
     await existeJugador(auth);
 
     const gananciaXP = obtenerXP(estadistica, extra);
@@ -98,7 +80,7 @@ async function agregarEstadistica(estadistica, auth, temporada, extra, clubId){
 
             `
             UPDATE estadisticas
-                SET ${columna} = ${columna} + 1, xp = xp + ${gananciaXP}, monedas = monedas + ${gananciaMonedas}
+                SET ${estadistica} = ${estadistica} + 1, xp = xp + ${gananciaXP}, monedas = monedas + ${gananciaMonedas}
                 WHERE jugador_auth = ? AND id_temporada = ?
             `,
             [auth, temporada]
@@ -113,7 +95,7 @@ async function agregarEstadistica(estadistica, auth, temporada, extra, clubId){
 
             `
             UPDATE estadisticas
-                SET ${columna} = ${columna} + 1, xp = xp + ${gananciaXP}, monedas = monedas + ${gananciaMonedas}
+                SET ${estadistica} = ${estadistica} + 1, xp = xp + ${gananciaXP}, monedas = monedas + ${gananciaMonedas}
                 WHERE id_club = ? AND id_temporada = ?
             `,
             [clubId, temporada]
@@ -123,15 +105,10 @@ async function agregarEstadistica(estadistica, auth, temporada, extra, clubId){
 }
 
 function existeEstadistica(estadistica){
-
-    const columna = estadisticasValidas[estadistica];
-    if (!columna) {
-        console.log("Estadistica no existente: " + estadistica);
+    if (!estadisticasValidas.includes(estadistica)) {
+        console.log("Estadistica no existente" + estadistica);
         throw new Error("Estadistica no existente");
     }
-
-    return columna;
-
 }
 
 function obtenerXP(estadistica, extra){
@@ -145,30 +122,7 @@ function obtenerXP(estadistica, extra){
     return XP ?? 0;
 }
 
-async function obtenerTop(estadistica, limite){
-
-    const columna = estadisticasValidas[estadistica];
-
-    if (!columna) {
-        return false;
-    }
-
-    const top = await database.query(
-        `
-        SELECT j.nombre AS nombre, e.${columna} AS stat FROM EstadisticasActuales e
-        INNER JOIN Jugadores j
-        ON j.auth = e.jugador_auth
-        ORDER BY ${columna}
-        LIMIT ?;
-        `,
-        [limite]
-    );
-
-    return top;
-}
-
 module.exports = {
     agregarEstadistica,
-    actualizarXP,
-    obtenerTop
+    actualizarXP
 }
