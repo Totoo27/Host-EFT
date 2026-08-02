@@ -265,7 +265,9 @@ const webhookURLs = {
     adminRecs: "https://discord.com/api/webhooks/1533534888681144361/PbdQroC8f_S8F_NQ-EfD3KX0zEuuBQFwn5osVWrV7XBq3BJHZg5lSLEErQCfdvZkpQ8Z",
     Recs: "https://discord.com/api/webhooks/1188203698996912138/KtxhoWNi5ChdG8u3-fXWWxFspzfXgzGUwQDDXByyarT56XSl1QWXlMmcJhwrE1u4-4XC",
     banLog: "https://discord.com/api/webhooks/1193650779836387478/daa8v24aiwvDQy25bSvlvkMF9YXbQQ1aXmDO4RLdlI_U10YF4GRWQewA8HP-AjRwDvUi",
-
+    adminCalls: "https://discord.com/api/webhooks/1190405741991960687/bbWX7UTZCRNFKXIcH7V5OFQl0z86M0mpfr1Yb1pihISXoka6oKX1LXEZ0YUdsVRKmyda",
+    leaveAndJoinLog: "https://discord.com/api/webhooks/1201610252211204188/U_iOz9yRSbCFoz_0Ych_TpgixHZ-BMkHNgGSq5hMW0GU6Jxu_iYSR733fGWvJa92labV",
+    linkLog: "https://discord.com/api/webhooks/1344375156113412158/k1htY8Ocm6euffDySCZDjz_z5og8NRiK4nT6u_DBwI9YZ87d8wfyorx7MbMmTV4WG4YC"
 }
 
 // Announcements
@@ -489,8 +491,7 @@ setInterval(() => {
 
 }, 1000);
 
-// EVENTS
-
+// Recording management
 let RecSistem = {
 
     getCustomDate: () => {
@@ -560,6 +561,8 @@ let RecSistem = {
     }
 
 };
+
+// EVENTS
 
 room.onRoomLink = async function(){
 
@@ -638,17 +641,30 @@ room.onPlayerJoin = async function(player){
         fillEmptiestTeam(playerID);
     }
 
+    sendWebhook(
+        'leaveAndJoinLog',
+        'Log Entrada y Salida',
+        '```\n' + 'Ha INGRESADO un Jugador: \nNOMBRE: ' + player.name + '\nIP: ' + player.conn + '\nID: ' + player.id + '\nAUTH: ' + player.auth + '\n```'
+    );
+
 };
 
 room.onPlayerLeave = async function(player){
     
+    const playerInfo = playersInfo.get(player.id);
+
+    sendWebhook(
+    'leaveAndJoinLog',
+    'Log Entrada y Salida',
+    '```\n' + 'Se ha IDO un Jugador: \nNOMBRE: ' + player.name + '\nIP: ' + playerInfo.conn + '\nID: ' + player.id + '\nAUTH: ' + playerInfo.auth + '\n```'
+    );
+
     await managePlayerLeft(player);
+    
 
 };
 
 room.onPlayerKicked = async function (kickedPlayer, reason, ban, byPlayer) {
-
-    await managePlayerLeft(kickedPlayer);
 
     if (byPlayer == null) return;
 
@@ -684,7 +700,9 @@ room.onPlayerChat = function (player, message, playerName) {
 
             case "nv":
             case "bb":
+
                 room.kickPlayer(playerID, "Nos vemos!", false);
+
             break;
 
             case "stats":
@@ -770,12 +788,11 @@ room.onPlayerChat = function (player, message, playerName) {
 
                     room.sendAnnouncement("[📞] SE ACABA DE LLAMAR UN ADMINSTRADOR", null, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT)   
                     
-                    // here: discord webHook logic to call admin
-                    /*sendWebhook(
-                        'adminCalls',
-                        'LLAMADAS ADMINISTRADORES',
-                        "Se ha solicitado un <@&1188258083823157309>\nRazón principal: " + reason[ADMIN]
-                    );*/
+                    sendWebhook(
+                    'adminCalls',
+                    'LLAMADAS ADMINISTRADORES',
+                    "Se ha solicitado un <@&1188258083823157309>\nRazón principal: " + reason[ADMIN]
+                    );
 
                     resetVotation(ADMIN);
                 }
