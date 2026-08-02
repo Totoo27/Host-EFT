@@ -609,6 +609,7 @@ room.onPlayerJoin = async function(player){
     if(await isRole(auth, ADMIN)){
         adminsList.add(playerID);
         room.setPlayerAdmin(playerID, true);
+        room.sendAnnouncement("[👮‍♂️] se ha unido el administrador " + playerName, null, textColor.ADMIN, textFont.BOLD, textSound.IMPORTANT);
     }
 
     // Load cache & info for player
@@ -879,10 +880,7 @@ room.onPlayerChat = function (player, message, playerName) {
                     break;
                 }
 
-                setRandomJerseys();
-                room.sendAnnouncement("[🔰] SE CAMBIARON LAS CAMISETAS:", null, textColor.SUCCESS, textFont.BOLD, textSound.NORMAL);
-                room.sendAnnouncement("[🔴] " + jerseyNames[0] + " VS " + jerseyNames[1] + " [🔵]", null, textColor.SUCCESS, textFont.BOLD, textSound.MUTE);
-
+                setRandomJerseys(true);
 
             break;
 
@@ -1191,7 +1189,7 @@ async function showMatchInfo(playerID){
 
 }
 
-async function setRandomJerseys(){
+async function setRandomJerseys(enableMessage = false){
 
     const jerseyAmount = await API.getAmountJerseys();
     let randomJerseyID = [-1, -1];
@@ -1220,6 +1218,12 @@ async function setRandomJerseys(){
 
     }
 
+    if(enableMessage){
+        room.sendAnnouncement("[🔰] SE CAMBIARON LAS CAMISETAS:", null, textColor.SUCCESS, textFont.BOLD, textSound.NORMAL);
+        room.sendAnnouncement("[🔴] " + jerseyNames[0] + " VS " + jerseyNames[1] + " [🔵]", null, textColor.SUCCESS, textFont.BOLD, textSound.MUTE);
+    }
+
+
 }
 
 async function autoStop(){
@@ -1227,6 +1231,8 @@ async function autoStop(){
     const cooldown = 5000;
 
     room.stopGame();
+    room.sendAnnouncement("[🏆] El MVP del partido es " + room.getPlayer(getMVP()).name + "!", null, textColor.STATS, textFont.BOLD, textSound.IMPORTANT);
+    room.sendAnnouncement("[🎥] La REC ya fué enviada al discord!", null, textColor.GAME, textFont.NORMAL, textSound.NORMAL);
     room.sendAnnouncement("Empezando partido en " + (cooldown/1000) + " segundos...", null, textColor.GAME, textFont.NORMAL, textSound.NORMAL);
     await delay(cooldown);
     room.startGame();
@@ -1764,6 +1770,7 @@ async function saveGameStats(winningTeam){
 
     let mvpAuth = getAuth(getMVP());
     await API.updatePlayerStats(mvpAuth, "mvps");
+
 }
 
 function saveGoalStats(team){
