@@ -244,6 +244,7 @@ const maxPlayers = 20;
 const scoreLimit = 4;
 const timeLimit = 4;
 const public = false;
+let linkAnunciado = false;
 
 var room = HBInit({
 	roomName: roomName,
@@ -257,6 +258,17 @@ room.setCustomStadium(stadium);
 room.setScoreLimit(scoreLimit);
 room.setTimeLimit(timeLimit);
 room.setTeamsLock(true);
+
+// Discord webHooks
+
+const webhookURLs = {
+    adminRecs: "https://discord.com/api/webhooks/1533534888681144361/PbdQroC8f_S8F_NQ-EfD3KX0zEuuBQFwn5osVWrV7XBq3BJHZg5lSLEErQCfdvZkpQ8Z",
+    Recs: "https://discord.com/api/webhooks/1188203698996912138/KtxhoWNi5ChdG8u3-fXWWxFspzfXgzGUwQDDXByyarT56XSl1QWXlMmcJhwrE1u4-4XC",
+    banLog: "https://discord.com/api/webhooks/1193650779836387478/daa8v24aiwvDQy25bSvlvkMF9YXbQQ1aXmDO4RLdlI_U10YF4GRWQewA8HP-AjRwDvUi",
+    adminCalls: "https://discord.com/api/webhooks/1190405741991960687/bbWX7UTZCRNFKXIcH7V5OFQl0z86M0mpfr1Yb1pihISXoka6oKX1LXEZ0YUdsVRKmyda",
+    leaveAndJoinLog: "https://discord.com/api/webhooks/1201610252211204188/U_iOz9yRSbCFoz_0Ych_TpgixHZ-BMkHNgGSq5hMW0GU6Jxu_iYSR733fGWvJa92labV",
+    linkLog: "https://discord.com/api/webhooks/1344375156113412158/k1htY8Ocm6euffDySCZDjz_z5og8NRiK4nT6u_DBwI9YZ87d8wfyorx7MbMmTV4WG4YC"
+}
 
 // Announcements
 
@@ -306,6 +318,8 @@ let playerKickBall = [
     ];
 
 let playersAFK = new Set();
+
+let goalList = [];
 
 // GoalKeeper Management
 
@@ -373,6 +387,9 @@ let averageXP = [
         0,
         0
     ]
+
+let winStreak = 0;
+let teamVictory = false;
 
 // Teams management
 
@@ -474,6 +491,77 @@ setInterval(() => {
 
 }, 1000);
 
+// Recording management
+let RecSistem = {
+
+    getCustomDate: () => {
+
+        let data = new Date().toLocaleDateString().split("/").join("-"),
+            relogio = new Date().toLocaleTimeString().split(":");
+
+        return `${data}-${relogio[0]}h${relogio[1]}m`;
+
+    },
+
+    sendDiscordWebhook: (scores) => {
+
+        let form = new FormData();
+        let xhr = new XMLHttpRequest();
+
+        if(!teamVictory) {
+
+            form.append(null, new File([room.stopRecording()], `PARTIDO DETENIDO: EFTRec-${RecSistem.getCustomDate()}.hbr2`, {"type": "text/plain"}));
+            xhr.open("POST", webhookURLs.adminRecs);
+            xhr.send(form);
+            return;
+
+        }
+
+        let
+            red = room.getPlayerList().filter((player) => player.team == 1).map((player) => player.name),
+            blue = room.getPlayerList().filter((player) => player.team == 2).map((player) => player.name);
+
+        form.append(null, new File([room.stopRecording()], `EFTRec-${RecSistem.getCustomDate()}.hbr2`, {"type": "text/plain"}));
+        form.append("payload_json", JSON.stringify(RecSistem.getParams(scores, red, blue)));
+
+        xhr.open("POST", webhookURLs.Recs);
+        xhr.send(form);
+    },
+
+    getParams: (scores, red, blue) => {
+        let params = {
+            "username": "EFT Recs",
+            "avatar_url": "",
+            "content": "",
+            "embeds": [{
+                "title": `${jerseyNames[RED-1]} 🔴 ${scores.red}  Vs.  ${scores.blue} 🔵 ${jerseyNames[BLUE-1]}`,
+                "color": 0xBB00BB,
+                "description": "",
+                "timestamp": null,
+                "author": {},
+                "image": {},
+                "thumbnail": {},
+                "footer": {
+                    "text": ``,
+                    "icon_url": ""
+                },
+                "fields": [
+                    {"name": ``, "value": `${red.join("\n")}`, "inline": true},
+                    {"name": ``, "value": ``, "inline": true},
+                    {"name": ``, "value": `${blue.join("\n")}`, "inline": true},
+                    {"name": `🧮 Cronología`, "value": "```\n" + goalList.join("\n") + "\n```"},
+                    {"name": `🌟 MVP: ${room.getPlayer(getMVP()).name}`, "value": ``, "inline": true},
+                    {"name": `🏅 Racha: ${winStreak}`, "value": ``, "inline": true},
+                ]
+            }],
+            "components": []
+        };
+
+        return params;
+    }
+
+};
+
 // EVENTS
 
 room.onRoomLink = async function(){
@@ -553,17 +641,38 @@ room.onPlayerJoin = async function(player){
         fillEmptiestTeam(playerID);
     }
 
+    sendWebhook(
+        'leaveAndJoinLog',
+        'Log Entrada y Salida',
+        '```\n' + 'Ha INGRESADO un Jugador: \nNOMBRE: ' + player.name + '\nIP: ' + player.conn + '\nID: ' + player.id + '\nAUTH: ' + player.auth + '\n```'
+    );
+
 };
 
 room.onPlayerLeave = async function(player){
     
+    const playerInfo = playersInfo.get(player.id);
+
+    sendWebhook(
+    'leaveAndJoinLog',
+    'Log Entrada y Salida',
+    '```\n' + 'Se ha IDO un Jugador: \nNOMBRE: ' + player.name + '\nIP: ' + playerInfo.conn + '\nID: ' + player.id + '\nAUTH: ' + playerInfo.auth + '\n```'
+    );
+
     await managePlayerLeft(player);
+    
 
 };
 
 room.onPlayerKicked = async function (kickedPlayer, reason, ban, byPlayer) {
 
-    await managePlayerLeft(kickedPlayer);
+    if (byPlayer == null) return;
+
+    sendWebhook(
+    'banLog',
+    'KickLog',
+    "se ha " + (ban ? "baneado" : "kickeado") + " a " + kickedPlayer.name + " por " + byPlayer.name + "\nrazón: " + reason
+    );
 
 };
 
@@ -591,7 +700,9 @@ room.onPlayerChat = function (player, message, playerName) {
 
             case "nv":
             case "bb":
+
                 room.kickPlayer(playerID, "Nos vemos!", false);
+
             break;
 
             case "stats":
@@ -677,12 +788,11 @@ room.onPlayerChat = function (player, message, playerName) {
 
                     room.sendAnnouncement("[📞] SE ACABA DE LLAMAR UN ADMINSTRADOR", null, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT)   
                     
-                    // here: discord webHook logic to call admin
-                    /*sendWebhook(
-                        'adminCalls',
-                        'LLAMADAS ADMINISTRADORES',
-                        "Se ha solicitado un <@&1188258083823157309>\nRazón principal: " + reason
-                    );*/
+                    sendWebhook(
+                    'adminCalls',
+                    'LLAMADAS ADMINISTRADORES',
+                    "Se ha solicitado un <@&1188258083823157309>\nRazón principal: " + reason[ADMIN]
+                    );
 
                     resetVotation(ADMIN);
                 }
@@ -817,8 +927,8 @@ room.onPlayerChat = function (player, message, playerName) {
                     break;
                 }
 
-                addBlackList(playerID);
                 kickBanPlayer(words, true, playerID);
+                addBlackList(playerID, words);
 
             break;
 
@@ -863,19 +973,20 @@ room.onPlayerChat = function (player, message, playerName) {
 
 };
 
-
 room.onTeamGoal = async function(team){
 
+    saveGoalStats(team);
     await manageGoalStatsAndDisplay(team);
 
 };
 
 room.onTeamVictory = async function(scores){
-
+    
+    teamVictory = true;
     const result = getTeamResult(scores);
     const winningTeam = result.winner;
     const loosingTeam = result.loser;
-
+    
     await saveGameStats(winningTeam);
 
     autoStop();
@@ -883,7 +994,9 @@ room.onTeamVictory = async function(scores){
     moveLosersToSpec(loosingTeam);
     if(winningTeam === BLUE){
         movePlayersToStreak(BLUE, RED);
+        winStreak = 0;
     }
+    winStreak++;
 
     updatePickMode();
 
@@ -891,8 +1004,9 @@ room.onTeamVictory = async function(scores){
         moveSpecToTeam(BLUE);
     }
 
-};
+    RecSistem.sendDiscordWebhook(scores);
 
+};
 
 room.onPlayerTeamChange = function (changedPlayer, byPlayer){
 
@@ -907,6 +1021,10 @@ room.onPlayerBallKick = function (player) {
 
 room.onGameStart = async function (byPlayer){
 
+    if (webhookURLs.Recs != "") {
+        room.startRecording();
+    }
+
     await setRandomJerseys();
     showMatchInfo();
     await calculateXPGains();
@@ -916,6 +1034,11 @@ room.onGameStart = async function (byPlayer){
 
 room.onGameStop = function () {
 
+    if(teamVictory == false){
+
+        RecSistem.sendDiscordWebhook(null);
+
+    }
     restartGameStats();
     autoFillTeams();
 
@@ -1398,9 +1521,15 @@ function kickBanPlayer(words, ban, playerID){
     
     room.kickPlayer(kickedID, words.slice(2).join(' '), ban);
 
+    sendWebhook(
+    'banLog',
+    'KickLog',
+    "se ha " + (ban ? "baneado" : "kickeado") + " a " + room.getPlayer(kickedID).name + " por " + room.getPlayer(playerID).name + "\nrazón: " + words.slice(2).join(' ')
+    );
+
 }
 
-async function addBlackList(playerID){
+async function addBlackList(playerID, words){
 
     const kickedID = getPlayerIDbyName(words[1].substring(1));
 
@@ -1413,8 +1542,13 @@ async function addBlackList(playerID){
     const BANNED = 5;
 
     await API.createPlayerRole(playerAuth, BANNED);
-
     room.sendAnnouncement("[🚧] Jugador blacklisteado correctamente.", playerID, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT);
+
+    sendWebhook(
+    'banLog',
+    'BlackList',
+    "se ha blacklisteado a " + room.getPlayer(kickedID).name + " por " + room.getPlayer(playerID).name + "\nrazón: " + words.slice(2).join(' ')
+    );
 
 }
 
@@ -1549,7 +1683,9 @@ function movePlayer(id, x, y) {
 }
 
 function restartGameStats(){
-    
+
+    goalList = [];
+
     isGKgot = false;
     gkRed = -1;
     gkBlue = -1;
@@ -1564,21 +1700,22 @@ function restartGameStats(){
         -1
     ];
 
-    isGameStarted = false;
-
     MVPstats = {};
+
+    isGameStarted = false;
+    teamVictory = false;
+
 
 }
 
 async function saveGameStats(winningTeam){
 
     if(!areEnoughPlayersInGame()){
-        console.log("No hay jugadores suficientes para guardar estadísticas de partido");
         return;
     }
     
     if(winningTeam === -1){
-        console.log("ERROR: No se guardaron estadisticas, equipo mal cargado");
+        console.error("No se guardaron estadisticas, equipo mal cargado", winningTeam);
         return;
     }
     
@@ -1627,6 +1764,18 @@ async function saveGameStats(winningTeam){
 
     let mvpAuth = getAuth(getMVP());
     await API.updatePlayerStats(mvpAuth, "mvps");
+}
+
+function saveGoalStats(team){
+
+    let goalTime = convertSecondsToMinutes(room.getScores().time);
+    if (goalTime[1] < 10) {
+        goalTime[1] = '0' + goalTime[1].toString();
+    }
+    const timeString = goalTime[0].toString() + ':' + goalTime[1].toString();
+    const goalType = playerKickBall[0].team === team ? '⚽' : '🤡';
+    team === 1 ? goalList.push("🟥 " + goalType + " " +  playerKickBall[0].name + " " + timeString) : goalList.push("🟦 "+ goalType + " " +  playerKickBall[0].name + " " + timeString)
+
 }
 
 function isGK(playerID){
@@ -2170,6 +2319,19 @@ function isNumeric(value){
     return /^-?\d+$/.test(value);
 }
 
+function convertSecondsToMinutes(seconds) {
+
+    if (seconds < 0) {
+        return -1;
+    }
+
+    let time = [0, 0];
+    time[0] = Math.floor(seconds / 60);
+    time[1] = Math.floor(seconds - time[0] * 60);
+
+    return time;
+}
+
 async function playerExists(auth){
 
     const player = await API.searchPlayer(auth);
@@ -2201,6 +2363,30 @@ function getPlayerInfoByAuth(auth) {
         }
     }
     return null;
+}
+
+function sendWebhook(type, username, content, avatarUrl = '') {
+    const url = webhookURLs[type];
+    if (!url) {
+        console.error("URL del webhook no encontrada para el tipo: ", type);
+        return;
+    }
+
+    const request = new XMLHttpRequest();
+    request.open("POST", url);
+    request.setRequestHeader('Content-type', 'application/json');
+
+    request.onerror = function() {
+        console.error("Error de red al enviar mensaje.");
+    };
+
+    const payload = {
+        avatar_url: avatarUrl,
+        username: username,
+        content: content
+    };
+
+    request.send(JSON.stringify(payload));
 }
 
 const API = {
