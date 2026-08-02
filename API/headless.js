@@ -263,7 +263,9 @@ room.setTeamsLock(true);
 
 const webhookURLs = {
     adminRecs: "https://discord.com/api/webhooks/1533534888681144361/PbdQroC8f_S8F_NQ-EfD3KX0zEuuBQFwn5osVWrV7XBq3BJHZg5lSLEErQCfdvZkpQ8Z",
-    Recs: "https://discord.com/api/webhooks/1188203698996912138/KtxhoWNi5ChdG8u3-fXWWxFspzfXgzGUwQDDXByyarT56XSl1QWXlMmcJhwrE1u4-4XC"
+    Recs: "https://discord.com/api/webhooks/1188203698996912138/KtxhoWNi5ChdG8u3-fXWWxFspzfXgzGUwQDDXByyarT56XSl1QWXlMmcJhwrE1u4-4XC",
+    banLog: "https://discord.com/api/webhooks/1193650779836387478/daa8v24aiwvDQy25bSvlvkMF9YXbQQ1aXmDO4RLdlI_U10YF4GRWQewA8HP-AjRwDvUi",
+
 }
 
 // Announcements
@@ -648,6 +650,14 @@ room.onPlayerKicked = async function (kickedPlayer, reason, ban, byPlayer) {
 
     await managePlayerLeft(kickedPlayer);
 
+    if (byPlayer == null) return;
+
+    sendWebhook(
+    'banLog',
+    'KickLog',
+    "se ha " + (ban ? "baneado" : "kickeado") + " a " + kickedPlayer.name + " por " + byPlayer.name + "\nrazón: " + reason
+    );
+
 };
 
 room.onPlayerChat = function (player, message, playerName) {
@@ -764,7 +774,7 @@ room.onPlayerChat = function (player, message, playerName) {
                     /*sendWebhook(
                         'adminCalls',
                         'LLAMADAS ADMINISTRADORES',
-                        "Se ha solicitado un <@&1188258083823157309>\nRazón principal: " + reason
+                        "Se ha solicitado un <@&1188258083823157309>\nRazón principal: " + reason[ADMIN]
                     );*/
 
                     resetVotation(ADMIN);
@@ -900,8 +910,8 @@ room.onPlayerChat = function (player, message, playerName) {
                     break;
                 }
 
-                addBlackList(playerID);
                 kickBanPlayer(words, true, playerID);
+                addBlackList(playerID, words);
 
             break;
 
@@ -1494,9 +1504,15 @@ function kickBanPlayer(words, ban, playerID){
     
     room.kickPlayer(kickedID, words.slice(2).join(' '), ban);
 
+    sendWebhook(
+    'banLog',
+    'KickLog',
+    "se ha " + (ban ? "baneado" : "kickeado") + " a " + room.getPlayer(kickedID).name + " por " + room.getPlayer(playerID).name + "\nrazón: " + words.slice(2).join(' ')
+    );
+
 }
 
-async function addBlackList(playerID){
+async function addBlackList(playerID, words){
 
     const kickedID = getPlayerIDbyName(words[1].substring(1));
 
@@ -1509,8 +1525,13 @@ async function addBlackList(playerID){
     const BANNED = 5;
 
     await API.createPlayerRole(playerAuth, BANNED);
-
     room.sendAnnouncement("[🚧] Jugador blacklisteado correctamente.", playerID, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT);
+
+    sendWebhook(
+    'banLog',
+    'BlackList',
+    "se ha blacklisteado a " + room.getPlayer(kickedID).name + " por " + room.getPlayer(playerID).name + "\nrazón: " + words.slice(2).join(' ')
+    );
 
 }
 
@@ -1673,12 +1694,11 @@ function restartGameStats(){
 async function saveGameStats(winningTeam){
 
     if(!areEnoughPlayersInGame()){
-        console.log("No hay jugadores suficientes para guardar estadísticas de partido");
         return;
     }
     
     if(winningTeam === -1){
-        console.log("ERROR: No se guardaron estadisticas, equipo mal cargado");
+        console.error("No se guardaron estadisticas, equipo mal cargado", winningTeam);
         return;
     }
     
@@ -2331,7 +2351,7 @@ function getPlayerInfoByAuth(auth) {
 function sendWebhook(type, username, content, avatarUrl = '') {
     const url = webhookURLs[type];
     if (!url) {
-        console.error("URL del webhook no encontrada para el tipo:", type);
+        console.error("URL del webhook no encontrada para el tipo: ", type);
         return;
     }
 
