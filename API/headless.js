@@ -390,6 +390,7 @@ let averageXP = [
 
 let winStreak = 0;
 let teamVictory = false;
+let drawAnnounced = false;
 
 // Teams management
 
@@ -976,6 +977,15 @@ room.onTeamGoal = async function(team){
     saveGoalStats(team);
     await manageGoalStatsAndDisplay(team);
 
+    const scores = room.getScores();
+    const limit = scores.scoreLimit;
+
+    if(scores.red === limit-1 && scores.blue === limit-1 && !drawAnnounced){
+        await delay(1000);
+        room.sendAnnouncement("[⚠️] ESTO SE DEFINIRÁ EN GOL DE ORO", null, textColor.GAME, textFont.BOLD, textSound.NORMAL);
+        drawAnnounced = true;
+    }
+
 };
 
 room.onTeamVictory = async function(scores){
@@ -1058,6 +1068,12 @@ room.onGameTick = function(){
 
         }
 
+    }
+
+    const scores = room.getScores();
+    if(scores.time >= scores.timeLimit + 1 && !drawAnnounced){
+        room.sendAnnouncement("[⚠️] ESTO SE DEFINIRÁ EN GOL DE ORO", null, textColor.GAME, textFont.BOLD, textSound.NORMAL);
+        drawAnnounced = true;
     }
 
     if (room.getPlayerList() === 0) return;
@@ -1710,7 +1726,7 @@ function restartGameStats(){
 
     isGameStarted = false;
     teamVictory = false;
-
+    drawAnnounced = false;
 
 }
 
