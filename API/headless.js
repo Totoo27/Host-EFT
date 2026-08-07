@@ -565,7 +565,7 @@ let RecSistem = {
 
 // EVENTS
 
-room.onRoomLink = async function(){
+room.onRoomLink = async function(link){
 
     room.startGame();
     if (public && !linkAnunciado){
@@ -648,6 +648,8 @@ room.onPlayerJoin = async function(player){
         'Log Entrada y Salida',
         '```\n' + 'Ha INGRESADO un Jugador: \nNOMBRE: ' + player.name + '\nIP: ' + player.conn + '\nID: ' + player.id + '\nAUTH: ' + player.auth + '\n```'
     );
+
+    room.sendAnnouncement("[⚠️] El servidor todavía está en BETA. usa !help para ver los comandos disponibles.", playerID, textColor.SUCCESS, textFont.BOLD, textSound.MUTE);
 
 };
 
@@ -932,7 +934,7 @@ room.onPlayerChat = function (player, message, playerName) {
             break;
 
             default:
-                room.sendAnnouncement("Comando no existente, utiliza !help para ver los comandos", null, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                room.sendAnnouncement("Comando no existente, utiliza !help para ver los comandos", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
 
         }
 
@@ -997,8 +999,6 @@ room.onTeamVictory = async function(scores){
     
     await saveGameStats(winningTeam);
 
-    autoStop();
-
     moveLosersToSpec(loosingTeam);
     if(winningTeam === BLUE){
         movePlayersToStreak(BLUE, RED);
@@ -1013,6 +1013,7 @@ room.onTeamVictory = async function(scores){
     }
 
     RecSistem.sendDiscordWebhook(scores);
+    autoStop();
 
 };
 
@@ -1042,10 +1043,8 @@ room.onGameStart = async function (byPlayer){
 
 room.onGameStop = function () {
 
-    if(teamVictory == false){
-
+    if(!teamVictory){
         RecSistem.sendDiscordWebhook(null);
-
     }
     restartGameStats();
     autoFillTeams();
@@ -1080,8 +1079,10 @@ room.onGameTick = function(){
 
     for(const [id, player] of InGameAFKData){
 
+        let team = room.getPlayer(id).team;
+        if (team === SPEC) return;
+
         let pos = room.getPlayer(id).position;
-        if (!pos) return; // Spectator
 
         // First time: save coords
         if (player.lastX === null) {
@@ -1248,6 +1249,7 @@ async function autoStop(){
 
     room.stopGame();
     room.sendAnnouncement("[🏆] El MVP del partido es " + room.getPlayer(getMVP()).name + "!", null, textColor.STATS, textFont.BOLD, textSound.IMPORTANT);
+    room.sendAnnouncement("[📈] El 🔴Red tiene una racha de " + winStreak + "!", null, textColor.STATS, textFont.BOLD, textSound.IMPORTANT);
     room.sendAnnouncement("[🎥] La REC ya fué enviada al discord!", null, textColor.GAME, textFont.NORMAL, textSound.NORMAL);
     room.sendAnnouncement("Empezando partido en " + (cooldown/1000) + " segundos...", null, textColor.GAME, textFont.NORMAL, textSound.NORMAL);
     await delay(cooldown);
@@ -1257,9 +1259,7 @@ async function autoStop(){
 
 async function calculateXPGains(){
 
-    if(!areEnoughPlayersInGame()){
-        return;
-    }
+    if(!areEnoughPlayersInGame()) return;
 
     const defaultGains = 8;
 
@@ -1425,7 +1425,6 @@ function movePlayersToStreak(team, toTeam){
     for(const playerID of players){
         room.setPlayerTeam(playerID, toTeam);
         updateTeamsChange(toTeam, playerID);
-
     };
 
 }
@@ -1454,7 +1453,6 @@ function getMVP(){
     for (const playerID in MVPstats) {
         if (MVPstats[playerID] > MVPstats[mvpID]) {
             mvpID = playerID;
-            
         }
 
     }
@@ -1752,32 +1750,45 @@ async function saveGameStats(winningTeam){
 
         for (const playerID of playersTeam[team]) {
             
-            let playerAuth = getAuth(playerID);
+            const playerAuth = getAuth(playerID);
 
-            await API.updatePlayerStats(playerAuth, "partidos_jugados");
+            if(!playerAuth){
+                console.error("Jugador sin auth", playerID);
+                continue;
+            }
 
-            if(isGK(playerID)){
+            try{
 
-                await API.updatePlayerStats(playerAuth, "partidos_arquero");
+                await API.updatePlayerStats(playerAuth, "partidos_jugados");
 
-                const cleanSheet = winningTeam === team && (scores.red == 0 || scores.blue == 0);
+                if(isGK(playerID)){
 
-                if(cleanSheet){
-                    await API.updatePlayerStats(playerAuth, "vallas_invictas");
-                    addPointsMVP(playerID, MVPpoints.clean_sheet);
+                    await API.updatePlayerStats(playerAuth, "partidos_arquero");
+
+                    const cleanSheet = winningTeam === team && (scores.red == 0 || scores.blue == 0);
+
+                    if(cleanSheet){
+                        await API.updatePlayerStats(playerAuth, "vallas_invictas");
+                        addPointsMVP(playerID, MVPpoints.clean_sheet);
+                    }
+                }            
+
+                if(team === winningTeam){
+
+                    await API.updatePlayerStats(playerAuth, "partidos_ganados");
+                    await API.updateXP(playerAuth, xpGains);
+                    console.log(playerAuth);
+
+                } else {
+
+                    await API.updatePlayerStats(playerAuth, "partidos_perdidos");
+                    await API.updateXP(playerAuth, -xpGains);
+                    console.log(playerAuth);
+
                 }
-            }            
 
-            if(team === winningTeam){
-
-                await API.updatePlayerStats(playerAuth, "partidos_ganados");
-                await API.updateXP(playerAuth, xpGains);
-
-            } else {
-
-                await API.updatePlayerStats(playerAuth, "partidos_perdidos");
-                await API.updateXP(playerAuth, -xpGains);
-
+            } catch(err) {
+                console.error(`Error guardando stats del jugador ${playerID}`, err);
             }
             
         }
@@ -2590,7 +2601,7 @@ const API = {
             return;
         }
 
-        const player = playersInfo.get(auth);
+        const player = getPlayerInfoByAuth(auth);
         const clubId = player.club;
 
         const response = await fetch(
