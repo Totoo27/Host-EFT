@@ -158,7 +158,7 @@ async function obtenerTop(estadistica, limite){
         SELECT j.nombre AS nombre, e.${columna} AS stat FROM EstadisticasActuales e
         INNER JOIN Jugadores j
         ON j.auth = e.jugador_auth
-        ORDER BY ${columna}
+        ORDER BY ${columna} DESC
         LIMIT ?;
         `,
         [limite]

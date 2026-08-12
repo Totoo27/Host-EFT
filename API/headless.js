@@ -301,6 +301,8 @@ const textFont = {
 
 // Player Management
 
+let muteTime = new Map(); // { playerID: timeLeft }
+
 let playersTeam = [
     new Set(),
     new Set(),
@@ -770,17 +772,7 @@ room.onPlayerChat = function (player, message, playerName) {
                 let announced = playerID;
                 if(!adminsList.has(playerID)) announced = null;                
 
-                if(gkRed != -1){
-                    room.sendAnnouncement("GK RED: " + getPlayerByID(gkRed).name, announced, textColor.RED, textFont.BOLD, textSound.NORMAL);
-                } else{
-                    room.sendAnnouncement("EL RED NO TIENE GK", announced, textColor.RED, textFont.BOLD, textSound.NORMAL);
-                }
-
-                if(gkBlue != -1){
-                    room.sendAnnouncement("GK BLUE: " + getPlayerByID(gkBlue).name, announced, textColor.BLUE, textFont.BOLD, textSound.NORMAL);
-                } else{
-                    room.sendAnnouncement("EL BLUE NO TIENE GK", announced, textColor.BLUE, textFont.BOLD, textSound.NORMAL);
-                }
+                showGKs(announced);
 
             break;
 
@@ -899,6 +891,46 @@ room.onPlayerChat = function (player, message, playerName) {
 
             break;
 
+            case "mute":
+
+                if(!adminsList.has(playerID)){
+                    room.sendAnnouncement(permissionMessage, playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
+                }
+
+                if (words.length != 3) {
+                    room.sendAnnouncement("!mute @jugador tiempo(opcional)", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
+                }
+
+                if (words.length == 3) {
+
+                    if (getPlayerIDbyName(words[1].substring(1)) != -1 && !isNaN(words[2])) {
+
+                        const defaultMuteTime = 1;
+                        const playerIDMuted = getPlayerIDbyName(words[1].substring(1))
+                        let timeMuted = parseInt(words[2]);
+                        if(isNaN(timeMuted)){
+                            timeMuted = defaultMuteTime;
+                        }
+                        const dateMuted = addMinutes(new Date(), timeMuted);
+                        muteTime.set(playerIDMuted, dateMuted);
+
+                        if (timeMuted > 0){
+                            room.sendAnnouncement("Se ha muteado a " + words[1].substring(1) + " por " + timeMuted + " minutos", null, textColor.SUCCESS);
+                        } else {
+                            room.sendAnnouncement("Se ha desmuteado a " + words[1].substring(1), null, textColor.SUCCESS);
+                        }
+
+                    } else {
+                        room.sendAnnouncement("ERROR: el tiempo se debe especificar con números", playerID, textColor.ERROR, textFont.BOLD);
+                    }
+
+                    break;
+                }
+
+            break;
+
             case "kick":
 
                 if(!adminsList.has(playerID)){
@@ -942,6 +974,14 @@ room.onPlayerChat = function (player, message, playerName) {
 
     }
 
+    if (muteTime.has(playerID)) {
+        const dateNow = new Date();
+        if (muteTime.get(playerID) > dateNow) {
+            room.sendAnnouncement("🚫 Muteado: No podes mandar mensajes 🚫", playerID, textColor.ERROR, textFont.BOLD);
+            return false;
+        }
+    }
+
     // Message management
 
     if(picking && isNumeric(message) && playerID === pickingPlayer){
@@ -973,6 +1013,22 @@ room.onPlayerChat = function (player, message, playerName) {
     return false; // Don't send default message
 
 };
+
+function showGKs(announced){
+
+    if(gkRed != -1){
+        room.sendAnnouncement("GK RED: " + getPlayerByID(gkRed).name, announced, textColor.RED, textFont.BOLD, textSound.NORMAL);
+    } else{
+        room.sendAnnouncement("EL RED NO TIENE GK", announced, textColor.RED, textFont.BOLD, textSound.NORMAL);
+    }
+
+    if(gkBlue != -1){
+        room.sendAnnouncement("GK BLUE: " + getPlayerByID(gkBlue).name, announced, textColor.BLUE, textFont.BOLD, textSound.NORMAL);
+    } else{
+        room.sendAnnouncement("EL BLUE NO TIENE GK", announced, textColor.BLUE, textFont.BOLD, textSound.NORMAL);
+    }
+
+}
 
 room.onTeamGoal = async function(team){
 
@@ -1062,7 +1118,8 @@ room.onGameTick = function(){
         if(!isGKgot){
             
             gkRed = getGK(RED, false)
-            gkBlue = getGK(BLUE, false); 
+            gkBlue = getGK(BLUE, false);
+            showGKs(null);
             isGKgot = true;
 
         }
@@ -1079,29 +1136,36 @@ room.onGameTick = function(){
 
     for(const [id, player] of InGameAFKData){
 
-        let team = room.getPlayer(id).team;
-        if (team === SPEC) return;
+        const roomPlayer = room.getPlayer(id);
 
-        let pos = room.getPlayer(id).position;
+        if(roomPlayer == null){
+            InGameAFKData.delete(id);
+            continue;
+        };
+
+        let team = roomPlayer.team;
+        if (team === SPEC) continue;
+
+        let pos = roomPlayer.position;
 
         // First time: save coords
         if (player.lastX === null) {
             player.lastX = pos.x;
             player.lastY = pos.y;
             player.lastMoveTick = 0;
-            return;
+            continue;
         }
 
         // Check if moved
-        const PixelTolerance = 3;
-        if (Math.abs(pos.x - player.lastX) > PixelTolerance || Math.abs(pos.y - player.lastY) > PixelTolerance) {
+        const PIXEL_TOLERANCE = 3;
+        if (Math.abs(pos.x - player.lastX) > PIXEL_TOLERANCE || Math.abs(pos.y - player.lastY) > PIXEL_TOLERANCE) {
 
             // Reset AFK info
             player.lastX = pos.x;
             player.lastY = pos.y;
             player.lastMoveTick = 0;
             player.warned = false;
-            return;
+            continue;
 
         }
 
@@ -1339,7 +1403,9 @@ function showDiscordMessage(playerID){
 }
 
 function showPageMessage(playerID){
-    room.sendAnnouncement("✨ Página EFT: ➡  ⬅", playerID, 0xF6FF43, textFont.BOLD, textSound.NORMAL);
+    
+    room.sendAnnouncement("✨ La página todavía está en desarrollo", playerID, 0xF6FF43, textFont.BOLD, textSound.NORMAL);
+    //room.sendAnnouncement("✨ Página EFT: ➡  ⬅", playerID, 0xF6FF43, textFont.BOLD, textSound.NORMAL);
 }
 
 function delay(time) {
@@ -1637,18 +1703,11 @@ function getGK(team, replacement) {
     if (team >= 3 || team <= 0) return -1;
     if (playersTeam[team].size <= 0) return -1;
 
-    let firstPlayer = getFirstFromTeam(team);
+    const firstPlayer = getFirstFromTeam(team);
     if (playersTeam[team].size == 1) return firstPlayer;
 
-    // Define arch position
-    let archPositionX;
-    if (team == 1) {
-        archPositionX = -700;
-    } else {
-        archPositionX = 700;
-    }
+    const archPositionX = team === RED ? -700 : 700;
 
-    // start the search with the first one
     let id = firstPlayer;
     let lesserDistance = Math.abs(
         room.getPlayer(id).position.x - archPositionX
@@ -1667,7 +1726,6 @@ function getGK(team, replacement) {
         }
     }
 
-    // Only move at the start of the game
     if(!replacement){
         movePlayer(id, archPositionX, -10);
     }
@@ -1746,9 +1804,15 @@ async function saveGameStats(winningTeam){
     const scores = room.getScores();
 
 
+    const playersOfGame = {
+        [SPEC]: [...playersTeam[SPEC]],
+        [RED]: [...playersTeam[RED]],
+        [BLUE]: [...playersTeam[BLUE]]
+    };
+
     for(let team = 1; team < TEAMS_AMOUNT + 1; team++){
 
-        for (const playerID of playersTeam[team]) {
+        for (const playerID of playersOfGame[team]) {
             
             const playerAuth = getAuth(playerID);
 
@@ -1766,6 +1830,7 @@ async function saveGameStats(winningTeam){
                     await API.updatePlayerStats(playerAuth, "partidos_arquero");
 
                     const cleanSheet = winningTeam === team && (scores.red == 0 || scores.blue == 0);
+                    console.log(cleanSheet + " winningTeam: " + winningTeam + " team: " + team + " scores.red: " + scores.red + " scores.blue: " + scores.blue);
 
                     if(cleanSheet){
                         await API.updatePlayerStats(playerAuth, "vallas_invictas");
@@ -1777,13 +1842,11 @@ async function saveGameStats(winningTeam){
 
                     await API.updatePlayerStats(playerAuth, "partidos_ganados");
                     await API.updateXP(playerAuth, xpGains);
-                    console.log(playerAuth);
 
                 } else {
 
                     await API.updatePlayerStats(playerAuth, "partidos_perdidos");
                     await API.updateXP(playerAuth, -xpGains);
-                    console.log(playerAuth);
 
                 }
 
@@ -2353,6 +2416,11 @@ function isNumeric(value){
     return /^-?\d+$/.test(value);
 }
 
+function addMinutes(date, minutes) {
+    date.setMinutes(date.getMinutes() + minutes);
+    return date;
+}
+
 function convertSecondsToMinutes(seconds) {
 
     if (seconds < 0) {
@@ -2652,7 +2720,7 @@ const API = {
                 },
             }
         )
-        
+
         return await response.json();
 
     }
