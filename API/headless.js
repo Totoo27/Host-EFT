@@ -1,4 +1,3 @@
-
 // API 
 
 const APIPort = 4321;
@@ -239,7 +238,7 @@ const stadium = `{  "name" : "EFT Map",
 // Init Room
 
 document.title = '⚡ x4 - EFT ⚡';
-const roomName = "[⚡] x4 - El futbol de Toto [T1] [⚡]";
+const roomName = "[⚡] x4 - El Futbol de Toto [T1] [⚡]";
 const maxPlayers = 20;
 const scoreLimit = 4;
 const timeLimit = 4;
@@ -589,6 +588,11 @@ room.onPlayerJoin = async function(player){
     const playerID = player.id;
     const playerName = player.name;
 
+    console.log("JOIN:", {
+        auth,
+        playerName: JSON.stringify(playerName)
+    });
+
     // Roles
     const ADMIN = 1;
     const BANNED = 5;
@@ -599,7 +603,7 @@ room.onPlayerJoin = async function(player){
 
     const stats = await API.searchPlayer(auth);
     
-    if(stats.nombre !== playerName){
+    if(stats.nombre != playerName){
         room.sendAnnouncement(stats.nombre + " se ha cambiado el nombre a " + playerName + "!", null, textColor.SUCCESS, textFont.BOLD, textSound.MUTE);
         await API.changeName(auth, playerName);
     }
@@ -824,12 +828,12 @@ room.onPlayerChat = function (player, message, playerName) {
                 }
 
                 if(playersAFK.has(playerID)){
-                    room.sendAnnouncement("Ya no estás afk", playerID, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT);
+                    room.sendAnnouncement(room.getPlayer(playerID).name + " ya no está afk", playerID, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT);
                     playersAFK.delete(playerID);
                     break;
                 }
 
-                room.sendAnnouncement("Estás afk", playerID, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT);
+                room.sendAnnouncement(room.getPlayer(playerID).name + " está afk", playerID, textColor.SUCCESS, textFont.BOLD, textSound.IMPORTANT);
                 playersAFK.add(playerID);
 
             break;
@@ -1001,8 +1005,8 @@ room.onPlayerChat = function (player, message, playerName) {
 
     let color = textColor.NORMAL;
     let font = textFont.NORMAL;
-    let teamEmoji = getTeamEmoji(player.team);
-    let rank = playerInfo.rank;
+    const teamEmoji = getTeamEmoji(player.team);
+    const rank = playerInfo.rank;
 
     if(adminsList.has(playerID)){
         color = textColor.ADMIN;
@@ -1013,22 +1017,6 @@ room.onPlayerChat = function (player, message, playerName) {
     return false; // Don't send default message
 
 };
-
-function showGKs(announced){
-
-    if(gkRed != -1){
-        room.sendAnnouncement("GK RED: " + getPlayerByID(gkRed).name, announced, textColor.RED, textFont.BOLD, textSound.NORMAL);
-    } else{
-        room.sendAnnouncement("EL RED NO TIENE GK", announced, textColor.RED, textFont.BOLD, textSound.NORMAL);
-    }
-
-    if(gkBlue != -1){
-        room.sendAnnouncement("GK BLUE: " + getPlayerByID(gkBlue).name, announced, textColor.BLUE, textFont.BOLD, textSound.NORMAL);
-    } else{
-        room.sendAnnouncement("EL BLUE NO TIENE GK", announced, textColor.BLUE, textFont.BOLD, textSound.NORMAL);
-    }
-
-}
 
 room.onTeamGoal = async function(team){
 
@@ -1265,8 +1253,9 @@ async function changeJersey(words, playerID){
 async function showMatchInfo(playerID){
 
     room.sendAnnouncement("[🔰] PARTIDO:", playerID, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
-    room.sendAnnouncement("[🔴] " + jerseyNames[RED-1] + " [" + (await getRank(averageXP[RED-1])).toString() + "]", playerID, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
-    room.sendAnnouncement("[🔵] " + jerseyNames[BLUE-1] + " [" + (await getRank(averageXP[BLUE-1])).toString() + "]", playerID, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
+    room.sendAnnouncement("[🔴] " + jerseyNames[RED-1] + " [" + (getRank(averageXP[RED-1])).toString() + "]", playerID, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
+    room.sendAnnouncement("[🔵] " + jerseyNames[BLUE-1] + " [" + (getRank(averageXP[BLUE-1])).toString() + "]", playerID, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
+    room.sendAnnouncement("[🏆] El RED mantiene una racha de " + winStreak + " victorias", playerID, textColor.GAME, textFont.BOLD, textSound.MUTE);
 
 }
 
@@ -1325,7 +1314,7 @@ async function calculateXPGains(){
 
     if(!areEnoughPlayersInGame()) return;
 
-    const defaultGains = 8;
+    const defaultGains = 20;
 
     const TEAMS_AMOUNT = 2;
     const PLAYERS_AMOUNT = 4;
@@ -1365,6 +1354,22 @@ async function calculateXPGains(){
         room.sendAnnouncement("[🔵] XP: Si ganas +" + ProfitXP[BLUE - 1] + ". Si perdes -" + ProfitXP[RED - 1], playersTeam[BLUE], textColor.STATS, textFont.BOLD, textSound.IMPORTANT);
     }
         
+
+}
+
+function showGKs(announced){
+
+    if(gkRed != -1){
+        room.sendAnnouncement("GK RED: " + getPlayerByID(gkRed).name, announced, textColor.RED, textFont.BOLD, textSound.NORMAL);
+    } else{
+        room.sendAnnouncement("EL RED NO TIENE GK", announced, textColor.RED, textFont.BOLD, textSound.NORMAL);
+    }
+
+    if(gkBlue != -1){
+        room.sendAnnouncement("GK BLUE: " + getPlayerByID(gkBlue).name, announced, textColor.BLUE, textFont.BOLD, textSound.NORMAL);
+    } else{
+        room.sendAnnouncement("EL BLUE NO TIENE GK", announced, textColor.BLUE, textFont.BOLD, textSound.NORMAL);
+    }
 
 }
 
@@ -1830,7 +1835,6 @@ async function saveGameStats(winningTeam){
                     await API.updatePlayerStats(playerAuth, "partidos_arquero");
 
                     const cleanSheet = winningTeam === team && (scores.red == 0 || scores.blue == 0);
-                    console.log(cleanSheet + " winningTeam: " + winningTeam + " team: " + team + " scores.red: " + scores.red + " scores.blue: " + scores.blue);
 
                     if(cleanSheet){
                         await API.updatePlayerStats(playerAuth, "vallas_invictas");

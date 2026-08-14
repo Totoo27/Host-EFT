@@ -106,7 +106,12 @@ async function buscarRol(auth, rolId){
 
 async function cambiarNombre(auth, nombre){
 
-    existeJugador(auth);
+    console.log("CAMBIANDO NOMBRE:", {
+        auth,
+        nombre: JSON.stringify(nombre)
+    });
+
+    await existeJugador(auth);
 
     await database.query(
         `
