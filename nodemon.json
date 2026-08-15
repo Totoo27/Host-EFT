@@ -1,0 +1,5 @@
+{
+  "ignore": ["logs/*", "*.log", "node_modules"],
+  "watch": ["API"],
+  "delay": "1000"
+}

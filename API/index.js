@@ -348,3 +348,13 @@ app.delete("/jugador-rol/eliminar/:authJugador/:idRol", async (req, res) => {
     }
 
 });
+
+process.on('SIGUSR2', async () => {
+  await database.end();
+  process.kill(process.pid, 'SIGUSR2');
+});
+
+process.on('SIGINT', async () => {
+  await database.end();
+  process.exit(0);
+});

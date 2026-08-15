@@ -280,7 +280,8 @@ const textColor = {
     GAME: 0xEDE06D,
     RED: 0xFF6363,
     BLUE: 0x708DFF,
-    HELP: 0xe8a436
+    HELP: 0xe8a436,
+    ADVICE: 0xF6FF43,
 };
 
 const textSound = {
@@ -393,6 +394,52 @@ let winStreak = 0;
 let teamVictory = false;
 let drawAnnounced = false;
 
+// Phrases management
+
+const discordTime = 240;
+let discordTimer = discordTime;
+
+const helpPhraseTime = 120;
+let helpPhraseTimer = helpPhraseTime;
+
+const helpPhrases = [
+
+    'Con "!top help" puedes ver los distintos tops de la temporada.',
+    'Usa "!help" para ver todos los comandos disponibles.',
+    'Usa "!rank help" para saber todo acerca de los rangos.',
+    'Los GKs de cada equipo son seleccionados por el más cercano de su arco.',
+    'El que quede top 1 de Experiencia será el ganador del Balón de oro a final de temporada.',
+
+];
+
+const lastHalfPhrases = [
+    (winning, loosing) => `Nos cuentan los del ${loosing} que la están pasando muy mal`,
+    (winning, loosing) => `Tremenda paliza anda dando el ${winning} a los del ${loosing}`,
+    (winning, loosing) => `El ${winning} está re tranqui en el partido por ahora...`,
+    (winning, loosing) => `La paliza táctica que se está comiendo el ${loosing} es preocupante`,
+    (winning, loosing) => `se nota que el ${winning} sabe jugar esta clase de partidos eh`,
+    (winning, loosing) => `Está para que el ${loosing} lo empate eh`,
+    (winning, loosing) => `Y si el ${winning} lo pechea?`,
+    (winning, loosing) => `Avisenle al ${loosing} que empezó el partido`,
+    (winning, loosing) => `El ${loosing} piensa que sigue en lag test`,
+    (winning, loosing) => `Tiene toda la pinta que Toto está en el ${loosing}`,
+]; 
+
+const lastHalfPhrasesDraw = [
+    "Trabadísimo el partido entre estos equipos",
+    "Falta poco para que termine y esto todavía siguen pelotudeando...",
+    "Aunque va en empate se nota un equipo metiendo mas huevo que el otro...",
+    "Los spec abuchean a la cancha por el mal juego de ambos equipos",
+    "Este partido está siendo un bodrio..",
+    "Este partido tiene mas hype que Gojo vs Sukuna",
+    "El que lo gana es gay dijeron por ahí",
+    "El que lo pierde es gay dijeron por ahí",
+    "Hay que avisarle a los equipos que no hay penales después del empate",
+    "A ver si van afinando la puntería y que se defina..."
+];
+
+let sentPhrase = false;
+
 // Teams management
 
 const SPEC = 0;
@@ -425,12 +472,12 @@ const RANKS = [
         name: "CONO",
         display: "👻CONO",
         min: -Infinity,
-        max: -5
+        max: -20
     },
     {
         name: "BRONCE",
         display: "🟤BRONCE",
-        min: -5,
+        min: -20,
         max: 100
     },
     {
@@ -443,30 +490,30 @@ const RANKS = [
         name: "ORO",
         display: "🟡ORO",
         min: 250,
-        max: 500
+        max: 750
     },
     {
         name: "PLATINO",
         display: "🔵PLATINO",
-        min: 500,
-        max: 1000
+        min: 750,
+        max: 1500
     },
     {
         name: "DIAMANTE",
         display: "🟣DIAMANTE",
-        min: 1000,
-        max: 2000
+        min: 1500,
+        max: 2500
     },
     {
         name: "ESMERALDA",
         display: "🟢ESMERALDA",
-        min: 2000,
-        max: 3000
+        min: 2500,
+        max: 3500
     },
     {
         name: "LEGEND",
         display: "💠LEGEND",
-        min: 3000,
+        min: 3500,
         max: Infinity
     }
 ];
@@ -475,9 +522,22 @@ const RANKS = [
 setInterval(() => {
     
     const time = 1;
-
+    
     // picker AFK management
     updatePickTimer(time);
+
+
+    discordTimer -= time;
+    if(discordTimer <= 0){
+        showDiscordMessage(null);
+        discordTimer = discordTime;
+    }
+
+    helpPhraseTimer -= time;
+    if(helpPhraseTimer <= 0){
+        showHelpPhrase();
+        helpPhraseTimer = helpPhraseTime;
+    }
 
     // Command timer
     for(const [id, info] of playersInfo){
@@ -588,11 +648,6 @@ room.onPlayerJoin = async function(player){
     const playerID = player.id;
     const playerName = player.name;
 
-    console.log("JOIN:", {
-        auth,
-        playerName: JSON.stringify(playerName)
-    });
-
     // Roles
     const ADMIN = 1;
     const BANNED = 5;
@@ -602,10 +657,11 @@ room.onPlayerJoin = async function(player){
     }
 
     const stats = await API.searchPlayer(auth);
-    
-    if(stats.nombre != playerName){
+
+    if(stats.nombre !== playerName){
         room.sendAnnouncement(stats.nombre + " se ha cambiado el nombre a " + playerName + "!", null, textColor.SUCCESS, textFont.BOLD, textSound.MUTE);
         await API.changeName(auth, playerName);
+        stats.nombre = playerName;
     }
 
     // Get roles
@@ -655,7 +711,7 @@ room.onPlayerJoin = async function(player){
         '```\n' + 'Ha INGRESADO un Jugador: \nNOMBRE: ' + player.name + '\nIP: ' + player.conn + '\nID: ' + player.id + '\nAUTH: ' + player.auth + '\n```'
     );
 
-    room.sendAnnouncement("[⚠️] El servidor todavía está en BETA. usa !help para ver los comandos disponibles.", playerID, textColor.SUCCESS, textFont.BOLD, textSound.MUTE);
+    room.sendAnnouncement("[⚠️] El servidor todavía está en BETA. usa !help para ver los comandos disponibles.", playerID, textColor.ADVICE, textFont.BOLD, textSound.MUTE);
 
 };
 
@@ -752,7 +808,7 @@ room.onPlayerChat = function (player, message, playerName) {
                     break;
 
                     case "puntos":
-                        room.sendAnnouncement("Gol +2\nAsistencia +1\nGol en contra -2\nValla invicta +4\nPartido abandonado -5", playerID, textColor.HELP, textFont.NORMAL, textSound.NORMAL);
+                        room.sendAnnouncement("Gol +3\nAsistencia +2\nGol en contra -2\nValla invicta +5\nmvp +3\nPartido abandonado -15", playerID, textColor.HELP, textFont.NORMAL, textSound.NORMAL);
                         room.sendAnnouncement("La xp por partidos ganados y perdidos dependerá de la XP del otro equipo.", playerID, textColor.HELP, textFont.BOLD, textSound.NORMAL);
                     break;
 
@@ -1115,9 +1171,28 @@ room.onGameTick = function(){
     }
 
     const scores = room.getScores();
+
     if(scores.time >= scores.timeLimit + 1 && !drawAnnounced){
         room.sendAnnouncement("[⚠️] ESTO SE DEFINIRÁ EN GOL DE ORO", null, textColor.GAME, textFont.BOLD, textSound.NORMAL);
+        if(areEnoughPlayersInGame()) room.sendAnnouncement("[✨] ASISTENCIA Y GOL SUMAN MÁS XP", null, textColor.GAME, textFont.BOLD, textSound.NORMAL);
         drawAnnounced = true;
+    }
+
+    if (!sentPhrase && scores.time > scores.timeLimit - 30) {
+
+        if (scores.red === scores.blue) {
+            const phrase = lastHalfPhrasesDraw[randomIntFromInterval(0, lastHalfPhrasesDraw.length - 1)];
+            room.sendAnnouncement("[⚡] " + phrase, null, textColor.GAME, textFont.BOLD, textSound.NORMAL);
+            sentPhrase = true;
+            return;
+        } 
+
+        const winning = scores.red > scores.blue ? "Red" : "Blue";
+        const loosing = scores.red > scores.blue ? "Blue" : "Red";
+    
+        const phrase = lastHalfPhrases[randomIntFromInterval(0, lastHalfPhrases.length - 1)](winning, loosing);
+        room.sendAnnouncement("[⚡] " + phrase, null, textColor.GAME, textFont.BOLD, textSound.NORMAL);
+        sentPhrase = true;
     }
 
     if (room.getPlayerList() === 0) return;
@@ -1253,8 +1328,8 @@ async function changeJersey(words, playerID){
 async function showMatchInfo(playerID){
 
     room.sendAnnouncement("[🔰] PARTIDO:", playerID, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
-    room.sendAnnouncement("[🔴] " + jerseyNames[RED-1] + " [" + (getRank(averageXP[RED-1])).toString() + "]", playerID, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
-    room.sendAnnouncement("[🔵] " + jerseyNames[BLUE-1] + " [" + (getRank(averageXP[BLUE-1])).toString() + "]", playerID, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
+    room.sendAnnouncement("[🔴] " + jerseyNames[RED-1] + " [" + (await getRank(averageXP[RED-1])).toString() + "]", playerID, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
+    room.sendAnnouncement("[🔵] " + jerseyNames[BLUE-1] + " [" + (await getRank(averageXP[BLUE-1])).toString() + "]", playerID, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
     room.sendAnnouncement("[🏆] El RED mantiene una racha de " + winStreak + " victorias", playerID, textColor.GAME, textFont.BOLD, textSound.MUTE);
 
 }
@@ -1404,13 +1479,20 @@ function getExpectedWinRate(ratingA, ratingB){
 }
 
 function showDiscordMessage(playerID){
-    room.sendAnnouncement("💬 Discord Link: ➡ https://discord.gg/ ⬅", playerID, 0xF6FF43, textFont.BOLD, textSound.NORMAL);
+    room.sendAnnouncement("💬 Discord Link: ➡ https://discord.gg/ ⬅", playerID, textColor.ADVICE, textFont.BOLD, textSound.NORMAL);
 }
 
 function showPageMessage(playerID){
     
-    room.sendAnnouncement("✨ La página todavía está en desarrollo", playerID, 0xF6FF43, textFont.BOLD, textSound.NORMAL);
+    room.sendAnnouncement("✨ La página todavía está en desarrollo", playerID, textColor.ADVICE, textFont.BOLD, textSound.NORMAL);
     //room.sendAnnouncement("✨ Página EFT: ➡  ⬅", playerID, 0xF6FF43, textFont.BOLD, textSound.NORMAL);
+}
+
+function showHelpPhrase(){
+
+    const phrase = helpPhrases[randomIntFromInterval(0, helpPhrases.length - 1)];
+    room.sendAnnouncement("[⚡] " + phrase, null, textColor.ADVICE, textFont.NORMAL, textSound.MUTE);
+
 }
 
 function delay(time) {
@@ -1788,6 +1870,7 @@ function restartGameStats(){
     isGameStarted = false;
     teamVictory = false;
     drawAnnounced = false;
+    sentPhrase = false;
 
 }
 
@@ -1904,9 +1987,9 @@ async function showStats(playerInfo){
 async function showRank(playerInfo){
 
     const rankMessage = playerInfo.rankMessage;
-    const nombre = playerInfo.stats.nombre;
+    const playerName = playerInfo.stats.nombre;
 
-    room.sendAnnouncement("--- Rango de " + nombre + " ---", null, textColor.STATS, textFont.NORMAL, textSound.MUTE);
+    room.sendAnnouncement("--- Rango de " + playerName + " ---", null, textColor.STATS, textFont.NORMAL, textSound.MUTE);
     room.sendAnnouncement(rankMessage, null, textColor.STATS, textFont.NORMAL, textSound.NORMAL);
 
 }
@@ -2230,7 +2313,7 @@ function updatePickMode(){
         if(enabledPicks || picking){
 
             if(picking){
-                room.sendAnnouncement("[⚠️] No hay suficientes jugadores, se desactivó el modo picks.", null, textColor.ERROR, textFont.BOLD, textSound.NORMAL);
+                room.sendAnnouncement("[⚠️] No hay suficientes jugadores, se desactivó el modo picks.", null, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
                 room.pauseGame(false);
             }
 
@@ -2245,6 +2328,9 @@ function updatePickMode(){
         return;
     }
 
+    if(!enabledPicks){
+        room.sendAnnouncement("[⚠️] SE HA ACTIVADO EL MODO PICKS", null, textColor.GAME, textFont.BOLD, textSound.IMPORTANT);
+    }
     enabledPicks = true;
 
     if(!picking){
@@ -2459,7 +2545,7 @@ function randomIntFromInterval(min, max) {
         throw new Error("El minimo no puede ser mayor al maximo");
     }
 
-    return Math.floor(Math.random() * (max - min + 1) + min)
+    return Math.floor(Math.random() * (max - min + 1) + min);
 }
 
 function getPlayerInfoByAuth(auth) {
@@ -2695,6 +2781,11 @@ const API = {
     },
 
     async changeName(auth, name){
+
+        console.trace("[API.changeName]", {
+            auth,
+            name
+        });
 
         const response = await fetch(
             `http://localhost:${APIPort}/jugador/cambiar-nombre`,
