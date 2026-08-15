@@ -5,13 +5,13 @@ const { existeClub } = require('./clubService');
 
 const GANANCIA_XP = {
     
-    goles: 2,
-    asistencias: 1,
+    goles: 3,
+    asistencias: 2,
     goles_en_contra: -2,
-    vallas_invictas: 4,
+    vallas_invictas: 5,
     mvps: 3,
 
-    partidos_abandonados: -5,
+    partidos_abandonados: -15,
     
     partidos_perdidos: 0,
     partidos_ganados: 0,

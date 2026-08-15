@@ -106,9 +106,9 @@ async function buscarRol(auth, rolId){
 
 async function cambiarNombre(auth, nombre){
 
-    console.log("CAMBIANDO NOMBRE:", {
+    console.trace("[CHANGE NAME]", {
         auth,
-        nombre: JSON.stringify(nombre)
+        nombre
     });
 
     await existeJugador(auth);
