@@ -1771,13 +1771,13 @@ async function manageGoalStatsAndDisplay(team){
 
     if(scoredForOwnTeam){
 
-        room.sendAnnouncement("[⚽] " + await getPhrase(scorer.name, 'gol'), null, color, textFont.NORMAL, textSound.IMPORTANT);
+        room.sendAnnouncement("[⚽] " + await getPhrase(scorer.name, 'gol', scorerAuth), null, color, textFont.NORMAL, textSound.IMPORTANT);
         await API.updatePlayerStats(scorerAuth, "goles");
         addPointsMVP(scorer.id, MVPpoints.goal);
 
         if(assistantAuth !== -1){ // Assist
 
-            room.sendAnnouncement("[👟] " + await getPhrase(assistant.name, 'asistencia'), null, color, textFont.NORMAL, textSound.IMPORTANT);
+            room.sendAnnouncement("[👟] " + await getPhrase(assistant.name, 'asistencia', assistantAuth), null, color, textFont.NORMAL, textSound.IMPORTANT);
             await API.updatePlayerStats(assistantAuth, "asistencias");
             addPointsMVP(assistant.id, MVPpoints.assist);
 
@@ -1785,7 +1785,7 @@ async function manageGoalStatsAndDisplay(team){
 
     } else { // own Goal
 
-        room.sendAnnouncement("[🤡] " + await getPhrase(scorer.name, 'gol_en_contra'), null, color, textFont.NORMAL, textSound.IMPORTANT);
+        room.sendAnnouncement("[🤡] " + await getPhrase(scorer.name, 'gol_en_contra', scorerAuth), null, color, textFont.NORMAL, textSound.IMPORTANT);
         await API.updatePlayerStats(scorerAuth, "goles_en_contra");
         addPointsMVP(scorer.id, MVPpoints.own_goal);
 
@@ -1793,12 +1793,14 @@ async function manageGoalStatsAndDisplay(team){
 
 }
 
-async function getPhrase(name, type){
+async function getPhrase(name, type, playerAuth){
 
-    const phrasesData = await API.getPhrasesByType(type);
-
+    let phrasesData = await API.getPhrasesByPlayer(playerAuth, type);
+    if(phrasesData.length === 0){
+        phrasesData = await API.getPhrasesByType(type);
+    }
+    
     const randomPhrase = phrasesData[randomIntFromInterval(0, phrasesData.length - 1)].frase;
-
     const phrase = randomPhrase.replaceAll("{player}", name);
 
     return phrase;    
@@ -2687,6 +2689,22 @@ const API = {
 
         const response = await fetch(
             `http://localhost:${APIPort}/frases/buscar/${tipoFrase}`,
+            {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+            }
+        )
+
+        return await response.json();
+
+    },
+
+    async getPhrasesByPlayer(auth, tipoFrase){
+
+        const response = await fetch(
+            `http://localhost:${APIPort}/frases/buscar/${tipoFrase}/${auth}`,
             {
                 method: "GET",
                 headers: {

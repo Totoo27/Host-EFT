@@ -98,6 +98,25 @@ app.post("/jugador-rol/crear", async (req, res) => {
 
 });
 
+app.get("/frases/buscar/:tipoFrase/:authJugador", async (req, res) => {
+
+    try {
+
+        const tipoFrase = req.params.tipoFrase;
+        const auth = req.params.authJugador;
+
+        const result = await frasesService.buscarFrasesDeTipo(tipoFrase, auth);
+
+        return res.status(200).json(result);
+
+    } catch(err) {
+
+        return res.status(500).json(err);
+
+    }
+
+});
+
 app.get("/frases/buscar/:tipoFrase", async (req, res) => {
 
     try {
