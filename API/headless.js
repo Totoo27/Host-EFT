@@ -819,6 +819,16 @@ room.onPlayerChat = function (player, message, playerName) {
                 
             break;
 
+            case "tienda":
+
+                showShop(playerID);
+
+            break;
+
+            case "monedas":
+                room.sendAnnouncement("Gol: 50$\nAsistencia: 25$\nValla invicta: 100$\nMVP: 50$\nPartido ganado: 10$", null, textColor.HELP, textFont.BOLD, textSound.NORMAL);
+            break;
+
             case "discord":
                 showDiscordMessage(playerID);
             break;
@@ -1283,6 +1293,21 @@ async function showTopPlayers(words, playerID){
 
 }
 
+async function checkAndMakePurchase(playerID, playerInfo, price){
+
+    const money = playerInfo.stats.monedas;
+
+    if(price > money){
+        room.sendAnnouncement("[💲] No tenés la plata suficiente para comprar.", playerID, textColor.ERROR, textFont.NORMAL, textSound.IMPORTANT);
+        return false;
+    }
+
+    await API.makePurchase(playerInfo.auth, price);
+    room.sendAnnouncement("[💲] Compra realizada con éxito! Dinero restante: $" + (money - price), playerID, textColor.SUCCESS, textFont.NORMAL, textSound.IMPORTANT);
+    return true;
+
+}
+
 async function changeJersey(words, playerID){
 
     if(words.length < 3 || (words[1] != "blue" && words[1] != "red")){
@@ -1449,7 +1474,8 @@ function showGKs(announced){
 }
 
 function showHelpMessage(playerID){
-    room.sendAnnouncement("Comandos disponibles:\n!nv o !bb: para kitear de la sala\n!stats: para ver tus estadísticas\n!rank help: para ver los comandos relacionados al rango\n!discord: para ver el link del discord\n!pagina: para ver el link de la pagina del host\n!gks: para ver los gks del partido\n!llamaradmin: para comenzar una votación para llamar un administrador\n!top o !top help: para ver los distintos rankings de estadísticas\n!partido: para ver información del partido que se esté jugando", playerID, textColor.HELP, textFont.BOLD, textSound.NORMAL);
+    room.sendAnnouncement("COMANDOS:", null, textColor.HELP, textFont.BOLD, textSound.NORMAL);
+    room.sendAnnouncement("Comandos disponibles:\n!nv o !bb: para kitear de la sala\n!stats: para ver tus estadísticas\n!rank help: para ver los comandos relacionados al rango\n!tienda: para ver todo lo que podes comprar con las monedas\n!monedas: para ver cómo se consiguen las monedas\n!discord: para ver el link del discord\n!pagina: para ver el link de la pagina del host\n!gks: para ver los gks del partido\n!llamaradmin: para comenzar una votación para llamar un administrador\n!top o !top help: para ver los distintos rankings de estadísticas\n!partido: para ver información del partido que se esté jugando", playerID, textColor.HELP, textFont.BOLD, textSound.NORMAL);
 }
 
 function updatePickTimer(time){
@@ -1492,6 +1518,12 @@ function showHelpPhrase(){
 
     const phrase = helpPhrases[randomIntFromInterval(0, helpPhrases.length - 1)];
     room.sendAnnouncement("[⚡] " + phrase, null, textColor.ADVICE, textFont.NORMAL, textSound.MUTE);
+
+}
+
+function showShop(playerID){
+
+    room.sendAnnouncement("✨ La tienda todavía no tiene ítems", playerID, textColor.ADVICE, textFont.BOLD, textSound.NORMAL);
 
 }
 
@@ -1966,7 +1998,7 @@ function isGK(playerID){
     return playerID === gkRed || playerID === gkBlue;
 }
 
-async function showStats(playerInfo){
+function showStats(playerInfo){
 
     const stats = playerInfo.stats;
 
@@ -1984,7 +2016,7 @@ async function showStats(playerInfo){
 
 }
 
-async function showRank(playerInfo){
+function showRank(playerInfo){
 
     const rankMessage = playerInfo.rankMessage;
     const playerName = playerInfo.stats.nombre;
@@ -2750,6 +2782,32 @@ const API = {
         player.stats = await API.searchPlayer(auth);
         player.rank = (await getRank(player.stats.xp)).toString(),
         player.rankMessage = (await getRankMessage(player.stats)).toString();
+
+    },
+
+    async makePurchase(auth, money){
+
+        const player = getPlayerInfoByAuth(auth);
+        const clubId = player.club;
+
+        const response = await fetch(
+            `http://localhost:${APIPort}/jugador/comprar`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    money,
+                    auth,
+                    clubId
+                })
+            }
+            
+        )
+
+        // update cache of player stats
+        player.stats = await API.searchPlayer(auth);
 
     },
 

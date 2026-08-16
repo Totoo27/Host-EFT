@@ -257,6 +257,24 @@ app.put("/jugador/agregar-estadistica", async (req, res) => {
 
 });
 
+app.put("/jugador/comprar", async (req, res) => {
+
+    try {
+
+        const { money, auth, clubId } = req.body;
+
+        await statsService.realizarCompra(auth, money, TEMPORADA_ACTIVA, clubId);
+
+        return res.status(200).json(`plata actualizada correctamente!`);
+
+    } catch (err){
+
+        return res.status(500).json(err);
+
+    }
+
+});
+
 app.put("/jugador/actualizar-xp", async (req, res) => {
 
     try {

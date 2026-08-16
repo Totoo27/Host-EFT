@@ -86,6 +86,23 @@ async function actualizarXP(auth, xp, temporada, clubId){
 
 }
 
+async function realizarCompra(auth, monedas, temporada, clubId){
+
+    await existeJugador(auth);
+
+    await database.query(
+
+            `
+            UPDATE estadisticas
+                SET monedas = monedas - ?
+                WHERE jugador_auth = ? AND id_temporada = ?
+            `,
+            [monedas, auth, temporada]
+
+    );
+
+}
+
 async function agregarEstadistica(estadistica, auth, temporada, extra, clubId){
 
     const columna = existeEstadistica(estadistica);
@@ -170,5 +187,6 @@ async function obtenerTop(estadistica, limite){
 module.exports = {
     agregarEstadistica,
     actualizarXP,
+    realizarCompra,
     obtenerTop
 }
