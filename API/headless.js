@@ -342,6 +342,15 @@ const MVPpoints = {
 
 }
 
+// Shop management
+
+const prices = {
+
+    frase: 35,
+    //club: 2500
+
+}
+
 // Vote management
 
 const VOTE_TIMEOUT = 20;
@@ -749,6 +758,7 @@ room.onPlayerChat = function (player, message, playerName) {
     const words = message.split(" ");
     const cooldown = 5;
     const playerInfo = playersInfo.get(playerID);
+    const subCommand = words[1];
 
     // Commands
     if (message.charAt(0) == '!') {
@@ -781,8 +791,6 @@ room.onPlayerChat = function (player, message, playerName) {
                     showRank(playerInfo);
                     break;
                 }
-
-                let subCommand = words[1];
 
                 switch(subCommand){
 
@@ -819,9 +827,65 @@ room.onPlayerChat = function (player, message, playerName) {
                 
             break;
 
-            case "tienda":
+            case "frases":
+                showAndManagePhrases(playerInfo, playerID, words);
+            break;
 
+            case "tienda":
                 showShop(playerID);
+            break;
+
+            case "comprar":
+
+                if(words.length === 1){
+                    room.sendAnnouncement("Tenés que especificar qué item querés comprar", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
+                }
+
+                const price = prices[subCommand];
+                if(!price){
+                    room.sendAnnouncement("Item no reconocido, utiliza !tienda para ver los ítems", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                    break;
+                }
+
+                switch(subCommand){
+
+                    case "frase":
+
+                        if(words.length === 2){
+                            room.sendAnnouncement("Tenés que especificar qué tipo de frase querés comprar: gol, asistencia, gec (gol en contra)", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                            break;
+                        }
+
+                        switch(words[2]){
+
+                            case "gol":
+                                if(!checkAndMakePurchase(playerID, playerInfo, price)) break;
+                                API.savePhrase('gol', playerInfo.auth);
+                            break;
+
+                            case "asistencia":
+                                if(!checkAndMakePurchase(playerID, playerInfo, price)) break;
+                                API.savePhrase('asistencia', playerInfo.auth);
+                            break;
+
+                            case "gec":
+                                if(!checkAndMakePurchase(playerID, playerInfo, price)) break;
+                                API.savePhrase('gol_en_contra', playerInfo.auth);
+                            break;
+
+                            default:
+                                room.sendAnnouncement("Tipo de frase no reconocido.", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+
+                        }
+
+                        
+
+                    break;
+                    
+                    default:
+                        room.sendAnnouncement("Item no reconocido, utiliza !tienda para ver los ítems", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+                }
 
             break;
 
@@ -1457,6 +1521,72 @@ async function calculateXPGains(){
 
 }
 
+async function showAndManagePhrases(playerInfo, playerID, words){
+
+    const validStats = {
+        gol: "gol",
+
+        asistencia: "asistencia",
+
+        gol_en_contra: "gol_en_contra",
+        gec: "gol_en_contra",
+    }
+
+    if(words.length < 2){
+        room.sendAnnouncement("Debes especificar qué tipo de frases deseas buscar", playerID, textColor.ERROR, textFont.BOLD, textSound.IMPORTANT);
+        return;
+    }
+
+    const stat = words[1];
+
+    if(!validStats[stat]){
+        room.sendAnnouncement(words[1] + " no es un tipo de estadística", playerID, textColor.ERROR, textFont.NORMAL, textSound.NORMAL);
+        room.sendAnnouncement("Estadísticas validas: 'gol', 'asistencia', 'gec' o 'gol_en_contra'", playerID, textColor.ERROR, textFont.NORMAL, textSound.NORMAL);
+        return;
+    }
+
+    const ownPhrases = await API.getPhrasesByPlayer(playerInfo.auth, validStats[stat]);
+    if(ownPhrases.length === 0){
+        room.sendAnnouncement("Todavía no tenes frases propias del tipo: " + stat, playerID, textColor.GAME, textFont.NORMAL, textSound.NORMAL);
+        return;
+    }
+
+    if(words[2] == 'modificar'){
+
+        const ID = words[3];
+
+        if(words.length < 5 || !isNumeric(ID)){
+            room.sendAnnouncement("Para modificar frases utiliza '!frases (tipo) modificar (ID) (texto)'", playerID, textColor.ERROR, textFont.NORMAL, textSound.NORMAL);
+            room.sendAnnouncement("Ejemplo: !frases gol modificar 1 golazooo! soy muy bueno", playerID, textColor.ERROR, textFont.NORMAL, textSound.NORMAL);
+            return;
+        }
+
+        const changePhrase = ownPhrases[ID-1];
+        if(!changePhrase){
+            room.sendAnnouncement("La ID " + ID + " no existe, usa '!frases " + stat + "' para ver las IDs", playerID, textColor.ERROR, textFont.NORMAL, textSound.NORMAL);
+            return;
+        }
+
+        const newPhrase = words.slice(4).join(' ');
+        await API.changePhrase(changePhrase.id, newPhrase);
+        
+        room.sendAnnouncement("Se ha cambiado la frase exitósamente!", playerID, textColor.SUCCESS, textFont.NORMAL, textSound.NORMAL);
+        room.sendAnnouncement("Frase: " + newPhrase, playerID, textColor.NORMAL, textFont.NORMAL, textSound.NORMAL);
+
+        return;
+    }
+
+    room.sendAnnouncement("Frases propias de " + validStats[stat] + ":", playerID, textColor.GAME, textFont.BOLD, textSound.NORMAL);
+    for(let i = 0; i < ownPhrases.length; i++){
+
+        room.sendAnnouncement("ID: " + (i+1) + " - " + ownPhrases[i].frase, playerID, textColor.NORMAL, textFont.NORMAL, textSound.MUTE);
+
+    }
+    room.sendAnnouncement("Para modificar frases utiliza '!frases (tipo) modificar (ID) (texto)'", playerID, textColor.GAME, textFont.NORMAL, textSound.NORMAL);
+    room.sendAnnouncement("Ejemplo: !frases gol modificar 1 golazooo! soy muy bueno", playerID, textColor.GAME, textFont.NORMAL, textSound.NORMAL);
+
+}
+
 function showGKs(announced){
 
     if(gkRed != -1){
@@ -1523,7 +1653,9 @@ function showHelpPhrase(){
 
 function showShop(playerID){
 
-    room.sendAnnouncement("✨ La tienda todavía no tiene ítems", playerID, textColor.ADVICE, textFont.BOLD, textSound.NORMAL);
+    room.sendAnnouncement("[✨] TIENDA", playerID, textColor.ADVICE, textFont.BOLD, textSound.NORMAL);
+    room.sendAnnouncement("$5000 - frase: Frase personalizada (gol, asistencia, o gol en contra)", playerID, textColor.HELP, textFont.NORMAL, textSound.MUTE);
+    room.sendAnnouncement("[✨] Utiliza !comprar (nombre) para comprar objetos de la tienda!", playerID, textColor.ADVICE, textFont.BOLD, textSound.NORMAL);
 
 }
 
@@ -1799,7 +1931,7 @@ async function getPhrase(name, type, playerAuth){
     if(phrasesData.length === 0){
         phrasesData = await API.getPhrasesByType(type);
     }
-    
+
     const randomPhrase = phrasesData[randomIntFromInterval(0, phrasesData.length - 1)].frase;
     const phrase = randomPhrase.replaceAll("{player}", name);
 
@@ -2635,6 +2767,24 @@ const API = {
     
     },
 
+    async savePhrase(type, auth){
+    
+        const response = await fetch(
+            `http://localhost:${APIPort}/frases/crear`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    type,
+                    auth
+                })
+            }
+        );
+    
+    },
+
     async createPlayerRole(auth, roleID){
 
         const response = await fetch(
@@ -2849,6 +2999,25 @@ const API = {
                     xp,
                     auth,
                     clubId
+                })
+            }
+            
+        )
+
+    },
+
+    async changePhrase(phraseID, phrase){
+
+        const response = await fetch(
+            `http://localhost:${APIPort}/frases/cambiar`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    phraseID,
+                    phrase
                 })
             }
             

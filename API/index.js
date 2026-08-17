@@ -11,7 +11,7 @@ const jugadorService = require('./services/jugadorService');
 const clubService = require('./services/clubService');
 const statsService = require('./services/statsService');
 const remeraService = require('./services/remeraService');
-const frasesService = require('./services/frasesService')
+const frasesService = require('./services/frasesService');
 
 const TEMPORADA_ACTIVA = 1;
 
@@ -73,6 +73,24 @@ app.post("/VIP/crear/:auth", async (req, res) => {
         return res.status(201).json("VIP creado exitosamente");
 
     } catch (err) {
+
+        return res.status(500).json(err);
+
+    }
+
+});
+
+app.post("/frases/crear", async (req, res) => {
+
+    try {
+
+        const { type, auth } = req.body;
+
+        await frasesService.crearFrase(type, auth);
+
+        return res.status(201).json("Jugador con rol agregado exitosamente.");
+
+    } catch(err){
 
         return res.status(500).json(err);
 
@@ -303,6 +321,24 @@ app.put("/jugador/actualizar-xp", async (req, res) => {
         await statsService.actualizarXP(auth, xp, TEMPORADA_ACTIVA, clubId);
 
         return res.status(200).json(`XP actualizada correctamente!`);
+
+    } catch (err){
+
+        return res.status(500).json(err);
+
+    }
+
+});
+
+app.put("/frases/cambiar", async (req, res) => {
+
+    try {
+
+        const { phraseID, phrase } = req.body;
+
+        await frasesService.cambiarFrase(phraseID, phrase);
+
+        return res.status(200).json(`Frase modificada exitosamente`);
 
     } catch (err){
 
